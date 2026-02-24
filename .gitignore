@@ -4,3 +4,6 @@
 
 # 原项目
 WeFlow-main/
+
+# 缓存文件
+__pycache__/
