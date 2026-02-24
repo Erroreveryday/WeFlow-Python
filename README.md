@@ -1,9 +1,8 @@
 # WeFlow-Python
 
-本项目基于 [WeFlow](https://github.com/hicccc77/WeFlow) 项目（原作者 [hicccc77](https://github.com/hicccc77)）进行二次开发，通过调用 WeFlow HTTP API 实现接收并处理指定会话的消息。
+本项目是基于 [WeFlow](https://github.com/hicccc77/WeFlow) 项目（作者 [hicccc77](https://github.com/hicccc77)）的 HTTP API 开发的独立程序，通过调用 WeFlow HTTP API 实现接收并处理指定会话的消息。
 
 本项目当前适配的 WeFlow 版本为 [v2.1.4](https://github.com/hicccc77/WeFlow/tree/v2.1.4)，使用本项目需先安装并配置好 WeFlow。
-
 
 ## 主要功能
 
@@ -24,7 +23,8 @@ WeFlow-Python/
 │       ├── api_client.py       # WeFlow API 调用模块
 │       └── message_listener.py # 消息监听模块
 ├── .gitignore
-└── README.md
+├── README.md
+└── LICENSE
 ```
 
 ## 快速开始
@@ -88,3 +88,9 @@ WeFlow-Python/
 - [ ] 实现消息处理逻辑
 - [ ] 实现微信自动回复
 - [ ] 实现处理多个对话的消息
+
+## 许可证
+
+本项目是 WeFlow 的独立衍生应用，基于 MIT 许可证开源，您可以在遵守许可证条款的前提下自由使用、修改和分发本项目的代码。
+
+详细信息请参阅 [LICENSE](LICENSE) 文件。
