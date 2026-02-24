@@ -3,6 +3,7 @@ import logging
 import time
 from weflow.api_client import WeFlowAPIClient
 from weflow.message_listener import MessageListener
+from weflow.aliyun_ai import AliyunAIClient
 
 def setup_logging(log_level):
     """设置日志配置"""
@@ -31,6 +32,11 @@ def main():
     start_date = config.get('WeFlow', 'start_date', fallback=None)
     start_days = config.getint('WeFlow', 'start_days', fallback=7)
     
+    # 阿里云AI配置
+    aliyun_api_key = config.get('AliyunAI', 'api_key')
+    aliyun_model = config.get('AliyunAI', 'model', fallback='qwen-flash')
+    history_count = config.getint('AliyunAI', 'history_count', fallback=20)
+    
     # 根据 start_mode 决定使用哪种方式
     if start_mode == 1:
         # 方式1：使用指定日期
@@ -57,6 +63,9 @@ def main():
         logger.error("健康检查失败，请确保 WeFlow API 服务已启动")
         return
     
+    # 创建阿里云AI客户端
+    aliyun_ai_client = AliyunAIClient(api_key=aliyun_api_key, model=aliyun_model)
+    
     # 创建消息监听器
     listener = MessageListener(
         api_client=api_client,
@@ -64,7 +73,9 @@ def main():
         polling_interval=polling_interval,
         limit=limit,
         start_date=start_date,
-        start_days=start_days
+        start_days=start_days,
+        aliyun_ai_client=aliyun_ai_client,
+        history_count=history_count
     )
     
     # 启动监听器

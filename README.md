@@ -7,24 +7,26 @@
 ## 主要功能
 
 - 通过调用 WeFlow HTTP API 实现实时接收指定微信会话的消息
+- 处理消息并调用阿里云 AI 模型生成回复（输出至终端）
 
 ## 项目结构
 
 ```
 WeFlow-Python/
-├── docs/
+├── docs/                       # 项目文档目录
 │   ├── WeFlow-HTTP-API.md      # WeFlow HTTP API 文档
-├── src/
+├── src/                        # 项目源代码目录
 │   ├── main.py                 # 主入口
 │   ├── config.ini              # 配置文件
 │   ├── requirements.txt        # 依赖包列表
 │   └── weflow/                 # WeFlow 相关模块
-│       ├── __init__.py
+│       ├── __init__.py         # 初始化模块
+│       ├── aliyun_ai.py        # 阿里云 AI 调用模块
 │       ├── api_client.py       # WeFlow API 调用模块
-│       └── message_listener.py # 消息监听模块
-├── .gitignore
-├── README.md
-└── LICENSE
+│       └── message_listener.py # WeFlow 消息监听模块
+├── .gitignore                  # Git 忽略文件
+├── README.md                   # 项目说明文档
+└── LICENSE                     # 开源许可证
 ```
 
 ## 快速开始
@@ -72,6 +74,8 @@ WeFlow-Python/
 
 在 `src/config.ini` 文件中可以配置以下参数：
 
+[WeFlow]
+
 - `base_url`: WeFlow HTTP API 地址
 - `talker`: 要监听的会话 ID
 - `polling_interval`: 轮询间隔（秒）
@@ -82,10 +86,16 @@ WeFlow-Python/
     - `start_days`: 方式2：往前推天数
 - `log_level`: 日志级别
 
+[AliyunAI]
+
+- `api_key`: 阿里云 API 密钥
+- `model`: 阿里云 AI 模型
+- `history_count`: 发送给 AI 的历史消息数量
+
 ## 项目计划
 
 - [x] 实现接收指定会话的消息
-- [ ] 实现消息处理逻辑
+- [x] 实现消息处理逻辑
 - [ ] 实现微信自动回复
 - [ ] 实现处理多个对话的消息
 
