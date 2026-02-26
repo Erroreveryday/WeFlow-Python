@@ -88,7 +88,6 @@ WeFlow-Python/
 - `talker`: 要监听的会话 ID
 - `polling_interval`: 轮询间隔（秒）
 - `limit`: 每次轮询获取的消息数量
-- `media`: **[未测试]** 是否开启媒体导出（0/1）
 - `start_mode`: 开始时间配置模式（1/2）
     - `start_date`: 方式1：指定日期，格式 YYYYMMDD
     - `start_days`: 方式2：往前推天数
@@ -108,15 +107,15 @@ WeFlow-Python/
 - `paste_shortcut`: 粘贴消息快捷键（默认 Ctrl+V）
 - `send_shortcut`: 发送消息快捷键（默认 Enter）
 - `toggle_window_shortcut`: 隐藏/显示窗口快捷键（默认 Ctrl+Alt+W）
-- `target_session`: 目标会话名称（用于搜索）
+- `target_session`: 目标会话名称，即对方的备注
 
 ## 项目计划
 
 - [x] 实现接收指定会话的消息
 - [x] 实现消息处理逻辑
 - [x] 实现微信自动回复
-- [ ] 支持处理媒体文件
-- [ ] 实现处理多个对话的消息
+- [ ] 实现处理媒体文件
+- [ ] 实现处理多个会话
 
 ## 许可证
 
