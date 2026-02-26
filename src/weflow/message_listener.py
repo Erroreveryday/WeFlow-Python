@@ -191,29 +191,41 @@ class MessageListener:
                 
                 # 构建消息格式
                 messages = [
-                    {"role": "system", "content": "你需要模拟'我'的身份和说话风格，基于历史聊天记录生成回复。\n\n角色：你就是'我'，需要以第一人称的方式直接回复消息。\n\n任务：分析历史聊天记录，理解对话上下文，然后以'我'的身份生成自然、符合语境的回复。\n\n风格要求：\n1. 保持语言风格一致，符合'我'的说话习惯\n2. 回复要自然、口语化，避免过于正式\n3. 基于上下文内容，不要偏离对话主题\n4. 回复长度要合理，不要过长或过短\n\n内容要求：\n1. 结合历史对话内容，保持连贯性\n2. 针对对方的问题或话题做出合理回应\n3. 可以包含适当的表情或语气词，使回复更生动\n4. 避免重复之前说过的内容\n\n请记住，你现在就是'我'，所有回复都要从'我'的角度出发。"}
+                    {"role": "system", "content": "你是'我'，以第一人称回复消息。基于历史聊天记录理解上下文，直接生成符合'我'说话风格的自然回复。\n\n其他用户消息格式为 [用户标识] 内容，仅用于区分用户，回复中绝对不要使用这些标识。\n\n要求：口语化、符合语境、连贯回应、适当表情、避免重复。\n\n记住：你就是'我'，只针对消息内容回复，不要使用用户标识。"}
                 ]
                 
                 # 添加历史消息
                 for msg in history_messages:
                     msg_sender = msg.get("senderUsername", "未知")
                     msg_content = msg.get("content", "")
-                    # 确定消息角色
+                    # 确定消息角色和内容格式
                     if msg_sender == self.talker:
                         # 假设talker是用户，AI是助手
                         role = "user"
+                        # 对于用户消息，直接使用内容
+                        formatted_content = msg_content
                     else:
                         role = "assistant"
-                    messages.append({"role": role, "content": msg_content})
+                        # 对于其他用户消息，添加用户名标识
+                        formatted_content = f"[{msg_sender}] {msg_content}"
+                    messages.append({"role": role, "content": formatted_content})
+                
+                # 输出调试信息，显示发送给AI的完整消息
+                self.logger.debug(f"发送给AI的消息内容: {messages}")
                 
                 # 调用AI生成回复
                 reply = self.aliyun_ai_client.generate_reply(messages)
                 if reply:
-                    self.logger.info(f"[AI] {reply}")
+                    # 清理回复中的用户标识前缀
+                    # 移除类似 [wxid_xxx] 这样的前缀
+                    import re
+                    cleaned_reply = re.sub(r'^\[wxid_\w+\]\s*', '', reply)
+                    self.logger.info(f"[AI] 原始回复: {reply}")
+                    self.logger.info(f"[AI] 清理后回复: {cleaned_reply}")
                     # 使用键盘自动化发送消息到微信
                     if self.keyboard_automation and self.target_session:
                         self.logger.info(f"正在发送消息到微信会话: {self.target_session}")
-                        success = self.keyboard_automation.send_message(reply, self.target_session)
+                        success = self.keyboard_automation.send_message(cleaned_reply, self.target_session)
                         if success:
                             self.logger.info("消息发送成功")
                         else:
