@@ -3,9 +3,10 @@ import threading
 import logging
 from datetime import datetime, timedelta
 from .api_client import WeFlowAPIClient
+from .keyboard_automation import KeyboardAutomation
 
 class MessageListener:
-    def __init__(self, api_client, talker, polling_interval=5, limit=50, start_date=None, start_days=7, aliyun_ai_client=None, history_count=20):
+    def __init__(self, api_client, talker, polling_interval=5, limit=50, start_date=None, start_days=7, aliyun_ai_client=None, history_count=20, config=None, target_session=None):
         self.api_client = api_client
         self.talker = talker
         self.polling_interval = polling_interval
@@ -14,10 +15,17 @@ class MessageListener:
         self.start_days = start_days
         self.aliyun_ai_client = aliyun_ai_client
         self.history_count = history_count
+        self.config = config
+        self.target_session = target_session
         self.running = False
         self.thread = None
         self.last_message_time = 0
         self.logger = logging.getLogger(__name__)
+        # 初始化键盘自动化实例
+        if config:
+            self.keyboard_automation = KeyboardAutomation(config)
+        else:
+            self.keyboard_automation = None
     
     def start(self):
         """开始监听新消息"""
@@ -202,6 +210,16 @@ class MessageListener:
                 reply = self.aliyun_ai_client.generate_reply(messages)
                 if reply:
                     self.logger.info(f"[AI] {reply}")
+                    # 使用键盘自动化发送消息到微信
+                    if self.keyboard_automation and self.target_session:
+                        self.logger.info(f"正在发送消息到微信会话: {self.target_session}")
+                        success = self.keyboard_automation.send_message(reply, self.target_session)
+                        if success:
+                            self.logger.info("消息发送成功")
+                        else:
+                            self.logger.error("消息发送失败")
+                    else:
+                        self.logger.warning("键盘自动化未初始化或目标会话未设置")
                 else:
                     self.logger.warning("阿里云AI未生成回复")
             

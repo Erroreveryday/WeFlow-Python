@@ -37,6 +37,9 @@ def main():
     aliyun_model = config.get('AliyunAI', 'model', fallback='qwen-flash')
     history_count = config.getint('AliyunAI', 'history_count', fallback=20)
     
+    # 微信配置
+    target_session = config.get('WeChat', 'target_session', fallback='文件传输助手')
+    
     # 根据 start_mode 决定使用哪种方式
     if start_mode == 1:
         # 方式1：使用指定日期
@@ -75,7 +78,9 @@ def main():
         start_date=start_date,
         start_days=start_days,
         aliyun_ai_client=aliyun_ai_client,
-        history_count=history_count
+        history_count=history_count,
+        config=config,
+        target_session=target_session
     )
     
     # 启动监听器

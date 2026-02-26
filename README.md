@@ -2,31 +2,33 @@
 
 本项目是基于 [WeFlow](https://github.com/hicccc77/WeFlow) 项目（作者 [hicccc77](https://github.com/hicccc77)）的 HTTP API 开发的独立程序，通过调用 WeFlow HTTP API 实现接收并处理指定会话的消息。
 
-本项目当前适配的 WeFlow 版本为 [v2.1.4](https://github.com/hicccc77/WeFlow/tree/v2.1.4)，使用本项目需先安装并配置好 WeFlow。
+本项目当前适配的 WeFlow 版本为 [v2.1.4](https://github.com/hicccc77/WeFlow/tree/v2.1.4)，使用本项目需先安装并配置好 WeFlow。项目开发所用的微信版本为 [4.1.7.30](https://weixin.qq.com/updates?platform=windows&version=4.1.7)。
 
 ## 主要功能
 
 - 通过调用 WeFlow HTTP API 实现实时接收指定微信会话的消息
 - 处理消息并调用阿里云 AI 模型生成回复（输出至终端）
+- 通过模拟快捷键操作微信，实现自动回复消息
 
 ## 项目结构
 
 ```
 WeFlow-Python/
-├── docs/                       # 项目文档目录
-│   ├── WeFlow-HTTP-API.md      # WeFlow HTTP API 文档
-├── src/                        # 项目源代码目录
-│   ├── main.py                 # 主入口
-│   ├── config.ini              # 配置文件
-│   ├── requirements.txt        # 依赖包列表
-│   └── weflow/                 # WeFlow 相关模块
-│       ├── __init__.py         # 初始化模块
-│       ├── aliyun_ai.py        # 阿里云 AI 调用模块
-│       ├── api_client.py       # WeFlow API 调用模块
-│       └── message_listener.py # WeFlow 消息监听模块
-├── .gitignore                  # Git 忽略文件
-├── README.md                   # 项目说明文档
-└── LICENSE                     # 开源许可证
+├── docs/                          # 项目文档目录
+│   ├── WeFlow-HTTP-API.md         # WeFlow HTTP API 文档
+├── src/                           # 项目源代码目录
+│   ├── main.py                    # 主入口
+│   ├── config.ini                 # 配置文件
+│   ├── requirements.txt           # 依赖包列表
+│   └── weflow/                    # WeFlow 相关模块
+│       ├── __init__.py            # 初始化模块
+│       ├── aliyun_ai.py           # 阿里云 AI 调用模块
+│       ├── api_client.py          # WeFlow API 调用模块
+│       └── message_listener.py    # WeFlow 消息监听模块
+│       └── keyboard_automation.py # 键盘操作模块
+├── .gitignore                     # Git 忽略文件
+├── README.md                      # 项目说明文档
+└── LICENSE                        # 开源许可证
 ```
 
 ## 快速开始
@@ -66,9 +68,15 @@ WeFlow-Python/
 
 3. **运行项目**
    ```bash
-   conda activate WeFlow
+   conda activate WeFlow # 激活 conda 环境（如果使用）
    python src/main.py
    ```
+
+### 注意事项
+
+- 确保 WeFlow HTTP API 服务已启动，否则项目将无法正常运行
+- 微信窗口需保持登录状态，且需处于“微信”主界面或“通讯录”界面，否则项目将无法正常运行（其余界面无法搜索用户）
+- 程序执行操作时，请不要手动操作微信窗口，否则可能会导致程序异常或错误
 
 ## 配置说明
 
@@ -92,11 +100,22 @@ WeFlow-Python/
 - `model`: 阿里云 AI 模型
 - `history_count`: 发送给 AI 的历史消息数量
 
+[WeChat]
+
+- `open_wechat`: 唤起微信程序的命令（Windows）
+- `search_shortcut`: 搜索会话快捷键（默认 Ctrl+F）
+- `select_shortcut`: 选中搜索结果快捷键（默认 Enter）
+- `paste_shortcut`: 粘贴消息快捷键（默认 Ctrl+V）
+- `send_shortcut`: 发送消息快捷键（默认 Enter）
+- `toggle_window_shortcut`: 隐藏/显示窗口快捷键（默认 Ctrl+Alt+W）
+- `target_session`: 目标会话名称（用于搜索）
+
 ## 项目计划
 
 - [x] 实现接收指定会话的消息
 - [x] 实现消息处理逻辑
-- [ ] 实现微信自动回复
+- [x] 实现微信自动回复
+- [ ] 支持处理媒体文件
 - [ ] 实现处理多个对话的消息
 
 ## 许可证
