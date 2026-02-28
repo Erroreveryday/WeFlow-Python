@@ -1,6 +1,0 @@
-requests
-dashscope
-pyautogui
-pyperclip
-pywin32
-psutil
