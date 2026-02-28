@@ -1,3 +1,4 @@
 requests
 psutil
+pywin32
 rapidocr_onnxruntime
