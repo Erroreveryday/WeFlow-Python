@@ -14,3 +14,9 @@ main.spec
 version_info.txt
 build/
 dist/
+
+# 模型文件
+*.onnx
+
+# 图片文件
+*.png
