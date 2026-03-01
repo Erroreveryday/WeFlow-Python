@@ -3,11 +3,21 @@ import psutil
 import ctypes
 from ctypes import wintypes
 import logging
+import sys
+import os
+
+# 添加src目录到Python路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils import load_config
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-BASE_URL = "http://127.0.0.1:5031"
+# 加载初始配置
+config = load_config()
+BASE_URL = f"http://127.0.0.1:{config.get('weflow_api_port', 5031)}"
+logging.info(f"初始API端口: {config.get('weflow_api_port', 5031)}")
 
 # 定义Windows API常量
 GW_OWNER = 4
@@ -41,9 +51,15 @@ user32.IsWindowVisible.restype = wintypes.BOOL
 
 def test_api_health():
     """测试 API 健康状态"""
+    # 每次调用时动态加载配置，确保使用最新的端口号
+    config = load_config()
+    port = config.get('weflow_api_port', 5031)
+    base_url = f"http://127.0.0.1:{port}"
+    logging.info(f"使用API端口: {port}")
+    
     logging.info("开始测试 API 健康状态...")
     try:
-        response = requests.get(f"{BASE_URL}/health", timeout=5)
+        response = requests.get(f"{base_url}/health", timeout=5)
         logging.info(f"请求状态码: {response.status_code}")
         logging.info(f"响应内容: {response.text}")
         

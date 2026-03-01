@@ -5,10 +5,11 @@ import logging
 # 添加src目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QStatusBar
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QStatusBar, QLineEdit
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, Q_ARG, QCoreApplication
 from PyQt5.QtGui import QFont
 from weflow.status_checker import test_api_health, check_weixin_status
+from utils import load_config, save_config
 
 # 自定义日志处理器，将日志输出到GUI
 class QTextEditLogger(logging.Handler):
@@ -50,6 +51,8 @@ class WeixinCheckThread(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        # 加载配置
+        self.config = load_config()
         self.init_ui()
         self.setup_logger()
     
@@ -70,6 +73,17 @@ class MainWindow(QMainWindow):
         
         # 主布局
         main_layout = QVBoxLayout(central_widget)
+        
+        # 配置区域
+        config_layout = QHBoxLayout()
+        config_label = QLabel("API端口号:")
+        self.port_input = QLineEdit(str(self.config.get('weflow_api_port', 5031)))
+        save_config_button = QPushButton("保存配置")
+        save_config_button.clicked.connect(self.save_config)
+        
+        config_layout.addWidget(config_label)
+        config_layout.addWidget(self.port_input)
+        config_layout.addWidget(save_config_button)
         
         # 状态检查区域
         status_layout = QHBoxLayout()
@@ -114,6 +128,7 @@ class MainWindow(QMainWindow):
         log_layout.addWidget(clear_log_button)
         
         # 添加到主布局
+        main_layout.addLayout(config_layout)
         main_layout.addLayout(status_layout)
         main_layout.addLayout(log_layout)
         
@@ -201,6 +216,25 @@ class MainWindow(QMainWindow):
         # 重新布局以适应新屏幕的DPI
         self.resize(self.width(), self.height())
         self.updateGeometry()
+    
+    def save_config(self):
+        """保存配置"""
+        try:
+            port = int(self.port_input.text())
+            
+            self.config['weflow_api_port'] = port
+            success, message = save_config(self.config)
+            
+            if success:
+                # 更新状态条消息
+                self.status_bar.showMessage(message)
+                logging.info(f"配置保存成功，API端口号: {port}")
+            else:
+                self.status_bar.showMessage(f"配置保存失败: {message}")
+                logging.error(f"配置保存失败: {message}")
+        except ValueError as e:
+            self.status_bar.showMessage(f"配置保存失败: {str(e)}")
+            logging.error(f"配置保存失败: {str(e)}")
 
 def main():
     # 启用高DPI缩放支持
