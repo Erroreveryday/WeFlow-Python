@@ -1,7 +1,13 @@
 import sys
+import os
 import logging
+
+# 添加src目录到Python路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QStatusBar
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, Q_ARG
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, Q_ARG, QCoreApplication
+from PyQt5.QtGui import QFont
 from weflow.status_checker import test_api_health, check_weixin_status
 
 # 自定义日志处理器，将日志输出到GUI
@@ -46,6 +52,13 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.init_ui()
         self.setup_logger()
+    
+    def showEvent(self, event):
+        """窗口显示事件"""
+        super().showEvent(event)
+        # 窗口显示后连接屏幕切换信号
+        if self.windowHandle():
+            self.windowHandle().screenChanged.connect(self.on_screen_changed)
     
     def init_ui(self):
         self.setWindowTitle("WeFlow 状态监控")
@@ -179,9 +192,29 @@ class MainWindow(QMainWindow):
     def clear_log(self):
         self.log_text_edit.clear()
         logging.info("日志已清空")
+    
+    def on_screen_changed(self, screen):
+        """处理屏幕切换事件"""
+        # 当窗口从一个屏幕移动到另一个屏幕时，重新调整布局
+        # 这里可以根据需要添加更多的适配逻辑
+        logging.info(f"窗口已切换到屏幕: {screen.name() if screen else '未知'}")
+        # 重新布局以适应新屏幕的DPI
+        self.resize(self.width(), self.height())
+        self.updateGeometry()
 
 def main():
+    # 启用高DPI缩放支持
+    QCoreApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QCoreApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    
+    # 创建应用实例
     app = QApplication(sys.argv)
+    
+    # 设置全局字体，确保在高DPI下字体清晰
+    font = QFont()
+    font.setPointSize(10)
+    app.setFont(font)
+    
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
