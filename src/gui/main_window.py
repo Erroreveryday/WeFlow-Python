@@ -230,10 +230,28 @@ class WeixinCheckThread(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        # 加载配置
-        self.config = load_config()
+        self.config = None
         self.init_ui()
         self.setup_logger()
+        self.show()
+        
+        # 使用定时器延迟加载配置和其他初始化操作
+        QTimer.singleShot(100, self.delayed_initialization)
+    
+    def delayed_initialization(self):
+        """延迟初始化：加载配置、加载会话、启动状态检查"""
+        print("开始延迟初始化...")
+        self.config = load_config()
+        
+        # 更新界面控件的值以匹配配置
+        self.show_hide_shortcut.setText(self.config.get('wechat_shortcuts', {}).get('show_hide_window', 'Ctrl+Alt+W'))
+        self.port_input.setText(str(self.config.get('weflow_api_port', 5031)))
+        send_option = self.config.get('wechat_shortcuts', {}).get('send_message', 'Enter')
+        if send_option == 'Enter':
+            self.send_message_enter.setChecked(True)
+        else:
+            self.send_message_ctrl_enter.setChecked(True)
+        
         self.load_wechat_sessions()
         
         # 初始化状态检查定时器
@@ -243,6 +261,7 @@ class MainWindow(QMainWindow):
         self.status_timer.start(5000)
         # 立即执行一次检查
         self.auto_check_status()
+        print("延迟初始化完成")
     
     def load_wechat_sessions(self):
         """加载微信会话配置到表格"""
@@ -371,7 +390,8 @@ class MainWindow(QMainWindow):
         show_hide_layout = QHBoxLayout()
         show_hide_label = QLabel("显示/隐藏微信窗口:")
         self.show_hide_shortcut = ShortcutLineEdit()
-        self.show_hide_shortcut.setText(self.config.get('wechat_shortcuts', {}).get('show_hide_window', 'Ctrl+Alt+W'))
+        # 使用默认值，稍后会在延迟初始化时更新
+        self.show_hide_shortcut.setText('Ctrl+Alt+W')
         self.show_hide_shortcut.textChanged.connect(self.save_shortcuts_config)
         show_hide_layout.addWidget(show_hide_label)
         show_hide_layout.addWidget(self.show_hide_shortcut)
@@ -385,11 +405,7 @@ class MainWindow(QMainWindow):
         self.send_message_ctrl_enter = QRadioButton("Ctrl+Enter")
         
         # 设置默认值
-        send_option = self.config.get('wechat_shortcuts', {}).get('send_message', 'Enter')
-        if send_option == 'Enter':
-            self.send_message_enter.setChecked(True)
-        else:
-            self.send_message_ctrl_enter.setChecked(True)
+        self.send_message_enter.setChecked(True)
         
         # 连接信号
         self.send_message_enter.toggled.connect(self.save_shortcuts_config)
@@ -415,7 +431,8 @@ class MainWindow(QMainWindow):
         
         config_layout = QHBoxLayout()
         config_label = QLabel("端口号:")
-        self.port_input = QLineEdit(str(self.config.get('weflow_api_port', 5031)))
+        # 使用默认值，稍后会在延迟初始化时更新
+        self.port_input = QLineEdit('5031')
         # 为端口输入框添加输入验证和自动保存
         self.port_input.textChanged.connect(self.save_api_port_config)
         # 设置输入验证器，只允许输入数字
@@ -883,7 +900,6 @@ def main():
     app.setFont(font)
     
     window = MainWindow()
-    window.show()
     sys.exit(app.exec_())
 
 if __name__ == "__main__":
