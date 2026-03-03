@@ -97,35 +97,46 @@ def save_config(config, config_file='config.json'):
     保存配置文件
     返回 (success, message)
     """
-    # 验证端口号
+    # 验证端口号（如果存在）
     if 'weflow_api_port' in config:
         port = config['weflow_api_port']
         if not isinstance(port, int):
-            return False, "端口号必须是整数"
-        if port < 1024 or port > 65535:
-            return False, "端口号必须在 1024-65535 之间"
+            # 端口号无效，使用默认值
+            config['weflow_api_port'] = 5031
+            print("端口号无效，已使用默认值 5031")
+        elif port < 1024 or port > 65535:
+            # 端口号超出范围，使用默认值
+            config['weflow_api_port'] = 5031
+            print("端口号超出范围，已使用默认值 5031")
     
-    # 验证 AI 配置
+    # 验证 AI 配置（如果存在）
     if 'ai' in config:
         ai_config = config['ai']
         if 'provider' in ai_config:
             provider = ai_config['provider']
             valid_providers = ['aliyun', 'deepseek']
             if provider not in valid_providers:
-                return False, f"AI 服务商必须是 {valid_providers} 之一"
+                # 服务商无效，使用默认值
+                ai_config['provider'] = 'aliyun'
+                print("AI 服务商无效，已使用默认值 aliyun")
             
             if 'model' in ai_config:
                 model = ai_config['model']
                 if 'providers' in ai_config and provider in ai_config['providers']:
                     valid_models = ai_config['providers'][provider].get('models', [])
                     if model not in valid_models:
-                        return False, f"AI 模型必须是 {valid_models} 之一"
+                        # 模型无效，使用默认值
+                        ai_config['model'] = valid_models[0] if valid_models else 'qwen3.5-flash'
+                        print(f"AI 模型无效，已使用默认值 {ai_config['model']}")
             else:
-                return False, "必须指定 AI 模型"
+                # 未指定模型，使用默认值
+                ai_config['model'] = 'qwen3.5-flash'
+                print("未指定 AI 模型，已使用默认值 qwen3.5-flash")
             
             # API 密钥可以为空，由用户自行配置
             if 'api_key' in ai_config and not isinstance(ai_config['api_key'], str):
-                return False, "API 密钥必须是字符串"
+                ai_config['api_key'] = ''
+                print("API 密钥无效，已使用空字符串")
     
     try:
         with open(config_file, 'w', encoding='utf-8') as f:
