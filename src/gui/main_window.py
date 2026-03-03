@@ -109,6 +109,8 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         self.setWindowTitle("WeFlow 状态监控")
         self.setGeometry(100, 100, 800, 600)
+        # 设置最小宽度，避免元素拥挤
+        self.setMinimumWidth(700)
         
         # 中心部件
         central_widget = QWidget()
@@ -185,10 +187,17 @@ class MainWindow(QMainWindow):
         self.sessions_table = QTableWidget()
         self.sessions_table.setColumnCount(4)
         self.sessions_table.setHorizontalHeaderLabels(["微信ID", "联系人备注", "自动回复", "操作"])
-        self.sessions_table.setColumnWidth(0, 150)
-        self.sessions_table.setColumnWidth(1, 100)
-        self.sessions_table.setColumnWidth(2, 80)
-        self.sessions_table.setColumnWidth(3, 200)
+        # 调整列宽，操作列只需要足够容纳删除按钮
+        self.sessions_table.setColumnWidth(0, 180)  # 微信ID
+        self.sessions_table.setColumnWidth(1, 120)  # 联系人备注
+        self.sessions_table.setColumnWidth(2, 80)   # 自动回复
+        self.sessions_table.setColumnWidth(3, 80)   # 操作（只需要容纳删除按钮）
+        # 设置表格水平拉伸策略，确保表格填满控件
+        from PyQt5.QtWidgets import QHeaderView
+        self.sessions_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.sessions_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.sessions_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        self.sessions_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
         
         # 操作按钮
         sessions_buttons_layout = QHBoxLayout()
