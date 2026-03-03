@@ -3,3 +3,4 @@ psutil==5.9.8
 pywin32==311
 rapidocr_onnxruntime==1.4.4
 PyQt5==5.15.10
+Pillow==12.1.1
