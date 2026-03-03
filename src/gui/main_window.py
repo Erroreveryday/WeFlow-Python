@@ -98,6 +98,14 @@ class MainWindow(QMainWindow):
         
         # 连接单元格变化信号
         self.sessions_table.itemChanged.connect(self.on_cell_changed)
+        
+        # 为自动回复列和操作列禁用选中效果
+        for row in range(self.sessions_table.rowCount()):
+            # 为自动回复列（索引2）和操作列（索引3）的单元格设置标志，禁用选中
+            for col in [2, 3]:
+                item = QTableWidgetItem()
+                item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
+                self.sessions_table.setItem(row, col, item)
     
     def showEvent(self, event):
         """窗口显示事件"""
@@ -447,6 +455,12 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("会话添加成功")
             logging.info("会话添加成功")
             self.load_wechat_sessions()
+            # 为新添加的行禁用自动回复列和操作列的选中效果
+            row = self.sessions_table.rowCount() - 1
+            for col in [2, 3]:
+                item = QTableWidgetItem()
+                item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
+                self.sessions_table.setItem(row, col, item)
         else:
             self.status_bar.showMessage(f"会话添加失败: {message}")
             logging.error(f"会话添加失败: {message}")
