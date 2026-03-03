@@ -5,7 +5,7 @@ import logging
 # 添加src目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QStatusBar, QLineEdit, QTableWidget, QTableWidgetItem, QCheckBox, QDialog, QFormLayout, QComboBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QStatusBar, QLineEdit, QTableWidget, QTableWidgetItem, QCheckBox, QDialog, QFormLayout, QComboBox, QGroupBox
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, Q_ARG, QCoreApplication, QTimer
 from PyQt5.QtGui import QFont
 from weflow.status_checker import test_api_health, check_weixin_status
@@ -98,7 +98,7 @@ class MainWindow(QMainWindow):
             # 删除按钮
             delete_button = QPushButton("删除")
             delete_button.setFixedSize(60, 20)
-            delete_button.setStyleSheet("QPushButton { padding: 2px; font-size: 9px; }")
+            delete_button.setStyleSheet("QPushButton { padding: 2px; font-size: 9px; color: red; }")
             delete_button.clicked.connect(lambda _, row=i: self.delete_wechat_session(row))
             
             button_layout.addWidget(delete_button)
@@ -135,44 +135,6 @@ class MainWindow(QMainWindow):
         # 主布局
         main_layout = QVBoxLayout(central_widget)
         
-        # 配置区域
-        config_layout = QHBoxLayout()
-        config_label = QLabel("API端口号:")
-        self.port_input = QLineEdit(str(self.config.get('weflow_api_port', 5031)))
-        # 为端口输入框添加输入验证和自动保存
-        self.port_input.textChanged.connect(self.save_api_port_config)
-        # 设置输入验证器，只允许输入数字
-        from PyQt5.QtGui import QIntValidator
-        validator = QIntValidator(1024, 65535, self)
-        self.port_input.setValidator(validator)
-        
-        config_layout.addWidget(config_label)
-        config_layout.addWidget(self.port_input)
-        
-        # 状态检查区域
-        status_layout = QHBoxLayout()
-        
-        # API状态检查
-        api_layout = QVBoxLayout()
-        api_label = QLabel("API状态:")
-        self.api_status_label = QLabel("未检查")
-        self.api_status_label.setStyleSheet("QLabel { border: 1px solid #ccc; padding: 5px; margin: 5px; }")
-        
-        api_layout.addWidget(api_label)
-        api_layout.addWidget(self.api_status_label)
-        
-        # 微信状态检查
-        weixin_layout = QVBoxLayout()
-        weixin_label = QLabel("微信状态:")
-        self.weixin_status_label = QLabel("未检查")
-        self.weixin_status_label.setStyleSheet("QLabel { border: 1px solid #ccc; padding: 5px; margin: 5px; }")
-        
-        weixin_layout.addWidget(weixin_label)
-        weixin_layout.addWidget(self.weixin_status_label)
-        
-        status_layout.addLayout(api_layout)
-        status_layout.addLayout(weixin_layout)
-        
         # 日志输出区域
         log_layout = QVBoxLayout()
         log_label = QLabel("日志输出:")
@@ -189,9 +151,8 @@ class MainWindow(QMainWindow):
         wechat_config_layout = QHBoxLayout()
         
         # 左侧：微信会话配置
+        sessions_group = QGroupBox("微信会话配置")
         wechat_sessions_layout = QVBoxLayout()
-        sessions_title = QLabel("微信会话配置")
-        sessions_title.setStyleSheet("QLabel { font-weight: bold; font-size: 12px; }")
         
         # 会话表格
         self.sessions_table = QTableWidget()
@@ -216,14 +177,16 @@ class MainWindow(QMainWindow):
         
         sessions_buttons_layout.addWidget(add_session_button)
         
-        wechat_sessions_layout.addWidget(sessions_title)
         wechat_sessions_layout.addWidget(self.sessions_table)
         wechat_sessions_layout.addLayout(sessions_buttons_layout)
+        sessions_group.setLayout(wechat_sessions_layout)
         
-        # 右侧：微信快捷键配置
+        # 右侧：配置区域
         wechat_shortcuts_layout = QVBoxLayout()
-        shortcuts_title = QLabel("微信快捷键配置")
-        shortcuts_title.setStyleSheet("QLabel { font-weight: bold; font-size: 12px; }")
+        
+        # 微信快捷键配置
+        shortcuts_group = QGroupBox("微信快捷键配置")
+        shortcuts_content_layout = QVBoxLayout()
         
         # 显示/隐藏微信窗口
         show_hide_layout = QHBoxLayout()
@@ -249,19 +212,62 @@ class MainWindow(QMainWindow):
         tip_label = QLabel("快捷键需与微信设置相同")
         tip_label.setStyleSheet("QLabel { font-size: 10px; color: #666; }")
         
-        wechat_shortcuts_layout.addWidget(shortcuts_title)
-        wechat_shortcuts_layout.addLayout(show_hide_layout)
-        wechat_shortcuts_layout.addLayout(send_message_layout)
-        wechat_shortcuts_layout.addWidget(tip_label)
+        shortcuts_content_layout.addLayout(show_hide_layout)
+        shortcuts_content_layout.addLayout(send_message_layout)
+        shortcuts_content_layout.addWidget(tip_label)
+        shortcuts_group.setLayout(shortcuts_content_layout)
+        
+        # API端口号配置
+        api_group = QGroupBox("WeFlow API 配置")
+        api_content_layout = QVBoxLayout()
+        
+        config_layout = QHBoxLayout()
+        config_label = QLabel("端口号:")
+        self.port_input = QLineEdit(str(self.config.get('weflow_api_port', 5031)))
+        # 为端口输入框添加输入验证和自动保存
+        self.port_input.textChanged.connect(self.save_api_port_config)
+        # 设置输入验证器，只允许输入数字
+        from PyQt5.QtGui import QIntValidator
+        validator = QIntValidator(1024, 65535, self)
+        self.port_input.setValidator(validator)
+        
+        config_layout.addWidget(config_label)
+        config_layout.addWidget(self.port_input)
+        
+        # API状态检查
+        api_layout = QHBoxLayout()
+        api_label = QLabel("API 状态")
+        self.api_status_label = QLabel("未检查")
+        self.api_status_label.setStyleSheet("QLabel { border: 1px solid #ccc; padding: 5px; margin: 5px; }")
+        
+        api_layout.addWidget(api_label)
+        api_layout.addWidget(self.api_status_label, 1)  # 添加拉伸因子1
+        
+        # 微信状态检查
+        weixin_layout = QHBoxLayout()
+        weixin_label = QLabel("微信状态")
+        self.weixin_status_label = QLabel("未检查")
+        self.weixin_status_label.setStyleSheet("QLabel { border: 1px solid #ccc; padding: 5px; margin: 5px; }")
+        
+        weixin_layout.addWidget(weixin_label)
+        weixin_layout.addWidget(self.weixin_status_label, 1)  # 添加拉伸因子1
+        
+        api_content_layout.addLayout(config_layout)
+        api_content_layout.addLayout(api_layout)
+        api_content_layout.addLayout(weixin_layout)
+        api_group.setLayout(api_content_layout)
+        
+        # 添加到右侧布局（从上到下：微信快捷键配置、API端口号配置+API状态、微信状态）
+        wechat_shortcuts_layout.addWidget(shortcuts_group)
+        wechat_shortcuts_layout.addSpacing(10)
+        wechat_shortcuts_layout.addWidget(api_group)
         
         # 添加到左右布局
-        wechat_config_layout.addLayout(wechat_sessions_layout, 2)  # 左边占2份
+        wechat_config_layout.addWidget(sessions_group, 2)  # 左边占2份
         wechat_config_layout.addLayout(wechat_shortcuts_layout, 1)  # 右边占1份
         
         # 添加到主布局
-        main_layout.addLayout(config_layout)
         main_layout.addLayout(wechat_config_layout)
-        main_layout.addLayout(status_layout)
         main_layout.addLayout(log_layout)
         
         # 状态栏

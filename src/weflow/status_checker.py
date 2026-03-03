@@ -135,8 +135,8 @@ def get_status_description(status_code):
     """
     status_map = {
         0: "微信未运行",
-        1: "微信后台运行（托盘状态，无界面）",
-        2: "微信窗口打开但被其他窗口覆盖",
+        1: "微信后台运行",
+        2: "微信窗口已打开",
         3: "微信窗口是当前活动窗口"
     }
     return status_map.get(status_code, "未知状态")
