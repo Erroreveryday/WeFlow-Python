@@ -5,11 +5,190 @@ import logging
 # 添加src目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QStatusBar, QLineEdit, QTableWidget, QTableWidgetItem, QCheckBox, QDialog, QFormLayout, QComboBox, QGroupBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QStatusBar, QLineEdit, QTableWidget, QTableWidgetItem, QCheckBox, QDialog, QFormLayout, QComboBox, QGroupBox, QRadioButton
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, Q_ARG, QCoreApplication, QTimer
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QKeyEvent, QKeySequence
 from weflow.status_checker import test_api_health, check_weixin_status
 from utils import load_config, save_config
+
+# 自定义快捷键输入控件
+class ShortcutLineEdit(QLineEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setReadOnly(True)
+        self.setPlaceholderText("点击此处设置快捷键")
+        self.original_shortcut = ""
+        self.recording = False
+        self.current_shortcut_parts = []
+        self.setStyleSheet("ShortcutLineEdit { background-color: #f0f0f0; }")
+        self.clicked.connect(self.start_recording)
+        # 安装全局事件过滤器到应用程序
+        app = QApplication.instance()
+        if app:
+            app.installEventFilter(self)
+    
+    clicked = pyqtSignal()
+    
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
+    
+    def eventFilter(self, obj, event):
+        # 在录制状态下，检测鼠标点击事件
+        if self.recording and event.type() == event.MouseButtonPress:
+            # 获取点击的控件
+            clicked_widget = QApplication.widgetAt(event.globalPos())
+            # 如果点击的不是当前控件，则停止录制
+            if clicked_widget != self and not self.isAncestorOf(clicked_widget):
+                logging.info("点击外部区域，停止录制快捷键")
+                self.stop_recording(success=False)
+                return True
+        return super().eventFilter(obj, event)
+    
+    def start_recording(self):
+        if not self.recording:
+            self.recording = True
+            self.original_shortcut = self.text()
+            self.current_shortcut_parts = []
+            self.setText("按下快捷键")
+            self.setStyleSheet("ShortcutLineEdit { background-color: #fffacd; }")
+            self.setFocus()
+            self.grabKeyboard()
+            logging.info("开始录制快捷键...")
+    
+    def stop_recording(self, success=True):
+        self.recording = False
+        self.releaseKeyboard()
+        self.current_shortcut_parts = []
+        if not success:
+            self.setText(self.original_shortcut)
+        self.setStyleSheet("ShortcutLineEdit { background-color: #f0f0f0; }")
+    
+    def update_display(self):
+        """实时更新显示当前按下的按键"""
+        if self.current_shortcut_parts:
+            display_text = "+".join(self.current_shortcut_parts)
+            self.setText(display_text)
+        else:
+            self.setText("按下快捷键")
+    
+    def keyPressEvent(self, event):
+        if not self.recording:
+            super().keyPressEvent(event)
+            return
+        
+        key = event.key()
+        modifiers = event.modifiers()
+        
+        # 处理修饰键，实时显示
+        if key in [Qt.Key_Control, Qt.Key_Alt, Qt.Key_Shift, Qt.Key_Meta]:
+            # 清空之前的按键，重新构建
+            self.current_shortcut_parts = []
+            if modifiers & Qt.ControlModifier:
+                self.current_shortcut_parts.append("Ctrl")
+            if modifiers & Qt.AltModifier:
+                self.current_shortcut_parts.append("Alt")
+            if modifiers & Qt.ShiftModifier:
+                self.current_shortcut_parts.append("Shift")
+            self.update_display()
+            return
+        
+        # 检查是否至少有一个修饰键
+        if not (modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.ShiftModifier)):
+            logging.warning("快捷键必须包含Ctrl、Alt或Shift键")
+            self.stop_recording(success=False)
+            return
+        
+        # 构建快捷键字符串
+        shortcut_parts = []
+        if modifiers & Qt.ControlModifier:
+            shortcut_parts.append("Ctrl")
+        if modifiers & Qt.AltModifier:
+            shortcut_parts.append("Alt")
+        if modifiers & Qt.ShiftModifier:
+            shortcut_parts.append("Shift")
+        
+        # 获取按键名称
+        key_name = ""
+        if key >= Qt.Key_F1 and key <= Qt.Key_F35:
+            key_name = f"F{key - Qt.Key_F1 + 1}"
+        elif key == Qt.Key_Space:
+            key_name = "Space"
+        elif key == Qt.Key_Tab:
+            key_name = "Tab"
+        elif key == Qt.Key_Enter or key == Qt.Key_Return:
+            key_name = "Enter"
+        elif key == Qt.Key_Escape:
+            key_name = "Esc"
+        elif key == Qt.Key_Backspace:
+            key_name = "Backspace"
+        elif key == Qt.Key_Delete:
+            key_name = "Delete"
+        elif key == Qt.Key_Insert:
+            key_name = "Insert"
+        elif key == Qt.Key_Home:
+            key_name = "Home"
+        elif key == Qt.Key_End:
+            key_name = "End"
+        elif key == Qt.Key_PageUp:
+            key_name = "PageUp"
+        elif key == Qt.Key_PageDown:
+            key_name = "PageDown"
+        elif key == Qt.Key_Up:
+            key_name = "Up"
+        elif key == Qt.Key_Down:
+            key_name = "Down"
+        elif key == Qt.Key_Left:
+            key_name = "Left"
+        elif key == Qt.Key_Right:
+            key_name = "Right"
+        else:
+            # 对于字母和数字，直接使用按键文本
+            key_text = event.text()
+            if key_text and key_text.isprintable() and len(key_text) == 1:
+                if key_text.isalpha():
+                    key_name = key_text.upper()
+                else:
+                    key_name = key_text
+            else:
+                # 使用Qt的按键名称
+                key_name = QKeySequence(key).toString()
+        
+        if not key_name:
+            logging.warning("无效的按键")
+            self.stop_recording(success=False)
+            return
+        
+        shortcut_parts.append(key_name)
+        shortcut_str = "+".join(shortcut_parts)
+        
+        # 设置新的快捷键
+        self.setText(shortcut_str)
+        self.stop_recording(success=True)
+        logging.info(f"快捷键已设置为: {shortcut_str}")
+    
+    def keyReleaseEvent(self, event):
+        if self.recording:
+            key = event.key()
+            # 当释放修饰键时，更新显示
+            if key in [Qt.Key_Control, Qt.Key_Alt, Qt.Key_Shift, Qt.Key_Meta]:
+                modifiers = event.modifiers()
+                self.current_shortcut_parts = []
+                if modifiers & Qt.ControlModifier:
+                    self.current_shortcut_parts.append("Ctrl")
+                if modifiers & Qt.AltModifier:
+                    self.current_shortcut_parts.append("Alt")
+                if modifiers & Qt.ShiftModifier:
+                    self.current_shortcut_parts.append("Shift")
+                self.update_display()
+        super().keyReleaseEvent(event)
+    
+    def focusOutEvent(self, event):
+        if self.recording:
+            logging.info("失去焦点，停止录制快捷键")
+            self.stop_recording(success=False)
+        super().focusOutEvent(event)
 
 # 自定义日志处理器，将日志输出到GUI
 class QTextEditLogger(logging.Handler):
@@ -123,7 +302,7 @@ class MainWindow(QMainWindow):
             self.windowHandle().screenChanged.connect(self.on_screen_changed)
     
     def init_ui(self):
-        self.setWindowTitle("WeFlow 状态监控")
+        self.setWindowTitle("WeFlow-Python")
         self.setGeometry(100, 100, 800, 600)
         # 设置最小宽度，避免元素拥挤
         self.setMinimumWidth(700)
@@ -191,7 +370,8 @@ class MainWindow(QMainWindow):
         # 显示/隐藏微信窗口
         show_hide_layout = QHBoxLayout()
         show_hide_label = QLabel("显示/隐藏微信窗口:")
-        self.show_hide_shortcut = QLineEdit(self.config.get('wechat_shortcuts', {}).get('show_hide_window', 'Ctrl+Alt+W'))
+        self.show_hide_shortcut = ShortcutLineEdit()
+        self.show_hide_shortcut.setText(self.config.get('wechat_shortcuts', {}).get('show_hide_window', 'Ctrl+Alt+W'))
         self.show_hide_shortcut.textChanged.connect(self.save_shortcuts_config)
         show_hide_layout.addWidget(show_hide_label)
         show_hide_layout.addWidget(self.show_hide_shortcut)
@@ -199,18 +379,30 @@ class MainWindow(QMainWindow):
         # 发送消息
         send_message_layout = QHBoxLayout()
         send_message_label = QLabel("发送消息:")
-        self.send_message_shortcut = QComboBox()
-        self.send_message_shortcut.addItems(["Enter", "Ctrl+Enter"])
+        
+        # 创建单选按钮组
+        self.send_message_enter = QRadioButton("Enter")
+        self.send_message_ctrl_enter = QRadioButton("Ctrl+Enter")
+        
         # 设置默认值
         send_option = self.config.get('wechat_shortcuts', {}).get('send_message', 'Enter')
-        self.send_message_shortcut.setCurrentText(send_option)
-        self.send_message_shortcut.currentTextChanged.connect(self.save_shortcuts_config)
+        if send_option == 'Enter':
+            self.send_message_enter.setChecked(True)
+        else:
+            self.send_message_ctrl_enter.setChecked(True)
+        
+        # 连接信号
+        self.send_message_enter.toggled.connect(self.save_shortcuts_config)
+        self.send_message_ctrl_enter.toggled.connect(self.save_shortcuts_config)
+        
         send_message_layout.addWidget(send_message_label)
-        send_message_layout.addWidget(self.send_message_shortcut)
+        send_message_layout.addWidget(self.send_message_enter)
+        send_message_layout.addWidget(self.send_message_ctrl_enter)
+        send_message_layout.addStretch()
         
         # 提示文本
-        tip_label = QLabel("快捷键需与微信设置相同")
-        tip_label.setStyleSheet("QLabel { font-size: 10px; color: #666; }")
+        tip_label = QLabel("注意：需与微信端的设置保持一致\n详见：微信->设置->快捷键")
+        tip_label.setStyleSheet("QLabel { font-size: 12px; color: #666; }")
         
         shortcuts_content_layout.addLayout(show_hide_layout)
         shortcuts_content_layout.addLayout(send_message_layout)
@@ -383,7 +575,9 @@ class MainWindow(QMainWindow):
             if 'wechat_shortcuts' not in self.config:
                 self.config['wechat_shortcuts'] = {}
             self.config['wechat_shortcuts']['show_hide_window'] = self.show_hide_shortcut.text()
-            self.config['wechat_shortcuts']['send_message'] = self.send_message_shortcut.currentText()
+            # 从单选按钮获取发送消息选项
+            send_option = 'Enter' if self.send_message_enter.isChecked() else 'Ctrl+Enter'
+            self.config['wechat_shortcuts']['send_message'] = send_option
             
             success, message = save_config(self.config)
             
@@ -394,7 +588,7 @@ class MainWindow(QMainWindow):
                     logging.info(f"配置保存成功，API端口号: {port}")
                 else:
                     self.status_bar.showMessage("快捷键配置保存成功，API端口号输入无效")
-                logging.info(f"微信快捷键配置已保存: 显示/隐藏={self.show_hide_shortcut.text()}, 发送消息={self.send_message_shortcut.currentText()}")
+                logging.info(f"微信快捷键配置已保存: 显示/隐藏={self.show_hide_shortcut.text()}, 发送消息={send_option}")
             else:
                 self.status_bar.showMessage(f"配置保存失败: {message}")
                 logging.error(f"配置保存失败: {message}")
@@ -409,12 +603,14 @@ class MainWindow(QMainWindow):
             if 'wechat_shortcuts' not in self.config:
                 self.config['wechat_shortcuts'] = {}
             self.config['wechat_shortcuts']['show_hide_window'] = self.show_hide_shortcut.text()
-            self.config['wechat_shortcuts']['send_message'] = self.send_message_shortcut.currentText()
+            # 从单选按钮获取发送消息选项
+            send_option = 'Enter' if self.send_message_enter.isChecked() else 'Ctrl+Enter'
+            self.config['wechat_shortcuts']['send_message'] = send_option
             
             success, message = save_config(self.config)
             
             if success:
-                logging.info(f"微信快捷键配置已保存: 显示/隐藏={self.show_hide_shortcut.text()}, 发送消息={self.send_message_shortcut.currentText()}")
+                logging.info(f"微信快捷键配置已保存: 显示/隐藏={self.show_hide_shortcut.text()}, 发送消息={send_option}")
             else:
                 logging.error(f"快捷键配置保存失败: {message}")
         except Exception as e:
