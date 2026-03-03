@@ -6,7 +6,7 @@ import logging
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QStatusBar, QLineEdit, QTableWidget, QTableWidgetItem, QCheckBox, QDialog, QFormLayout, QComboBox
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, Q_ARG, QCoreApplication
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, Q_ARG, QCoreApplication, QTimer
 from PyQt5.QtGui import QFont
 from weflow.status_checker import test_api_health, check_weixin_status
 from utils import load_config, save_config
@@ -56,6 +56,14 @@ class MainWindow(QMainWindow):
         self.init_ui()
         self.setup_logger()
         self.load_wechat_sessions()
+        
+        # 初始化状态检查定时器
+        self.status_timer = QTimer(self)
+        self.status_timer.timeout.connect(self.auto_check_status)
+        # 每5秒检查一次状态
+        self.status_timer.start(5000)
+        # 立即执行一次检查
+        self.auto_check_status()
     
     def load_wechat_sessions(self):
         """加载微信会话配置到表格"""
@@ -149,24 +157,18 @@ class MainWindow(QMainWindow):
         api_label = QLabel("API状态:")
         self.api_status_label = QLabel("未检查")
         self.api_status_label.setStyleSheet("QLabel { border: 1px solid #ccc; padding: 5px; margin: 5px; }")
-        api_check_button = QPushButton("检查API状态")
-        api_check_button.clicked.connect(self.check_api_status)
         
         api_layout.addWidget(api_label)
         api_layout.addWidget(self.api_status_label)
-        api_layout.addWidget(api_check_button)
         
         # 微信状态检查
         weixin_layout = QVBoxLayout()
         weixin_label = QLabel("微信状态:")
         self.weixin_status_label = QLabel("未检查")
         self.weixin_status_label.setStyleSheet("QLabel { border: 1px solid #ccc; padding: 5px; margin: 5px; }")
-        weixin_check_button = QPushButton("检查微信状态")
-        weixin_check_button.clicked.connect(self.check_weixin_status)
         
         weixin_layout.addWidget(weixin_label)
         weixin_layout.addWidget(self.weixin_status_label)
-        weixin_layout.addWidget(weixin_check_button)
         
         status_layout.addLayout(api_layout)
         status_layout.addLayout(weixin_layout)
@@ -284,6 +286,18 @@ class MainWindow(QMainWindow):
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         logger.addHandler(console_handler)
+    
+    def auto_check_status(self):
+        """自动检查API和微信状态"""
+        # 检查API状态
+        self.api_thread = ApiCheckThread()
+        self.api_thread.finished.connect(self.on_api_check_finished)
+        self.api_thread.start()
+        
+        # 检查微信状态
+        self.weixin_thread = WeixinCheckThread()
+        self.weixin_thread.finished.connect(self.on_weixin_check_finished)
+        self.weixin_thread.start()
     
     def check_api_status(self):
         self.status_bar.showMessage("正在检查API状态...")

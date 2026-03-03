@@ -17,7 +17,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # 加载初始配置
 config = load_config()
 BASE_URL = f"http://127.0.0.1:{config.get('weflow_api_port', 5031)}"
-logging.info(f"初始API端口: {config.get('weflow_api_port', 5031)}")
 
 # 定义Windows API常量
 GW_OWNER = 4
@@ -55,27 +54,19 @@ def test_api_health():
     config = load_config()
     port = config.get('weflow_api_port', 5031)
     base_url = f"http://127.0.0.1:{port}"
-    logging.info(f"使用API端口: {port}")
     
-    logging.info("开始测试 API 健康状态...")
     try:
         response = requests.get(f"{base_url}/health", timeout=5)
-        logging.info(f"请求状态码: {response.status_code}")
-        logging.info(f"响应内容: {response.text}")
         
         if response.status_code == 200:
             data = response.json()
             if data.get("status") == "ok":
-                logging.info("API 服务运行正常")
                 return True, "API 服务运行正常"
             else:
-                logging.error(f"API 响应状态异常: {data}")
                 return False, f"API 响应状态异常: {data}"
         else:
-            logging.error(f"API 请求失败，状态码: {response.status_code}")
             return False, f"API 请求失败，状态码: {response.status_code}"
     except requests.exceptions.RequestException as e:
-        logging.error(f"API 请求异常: {str(e)}")
         return False, f"API 请求异常: {str(e)}"
 
 def is_weixin_running():
@@ -86,11 +77,9 @@ def is_weixin_running():
     for proc in psutil.process_iter(['pid', 'name', 'status']):
         try:
             if proc.info['name'] == 'Weixin.exe':
-                logging.info(f"微信进程已找到，PID: {proc.info['pid']}, 状态: {proc.info['status']}")
                 return True
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
-    logging.info("未找到微信进程")
     return False
 
 def get_weixin_window_status():
@@ -158,5 +147,4 @@ def check_weixin_status():
     """
     status_code = get_weixin_window_status()
     status_description = get_status_description(status_code)
-    logging.info(f"微信状态: {status_description}")
     return status_code, status_description
