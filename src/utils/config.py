@@ -53,7 +53,6 @@ def load_config(config_file='config.json'):
     try:
         with open(config_file, 'r', encoding='utf-8') as f:
             config = json.load(f)
-        print(f"配置文件 {config_file} 加载成功")
         return config
     except Exception as e:
         print(f"加载配置文件失败: {e}")

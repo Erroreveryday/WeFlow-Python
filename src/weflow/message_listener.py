@@ -69,7 +69,7 @@ class MessageListenerThread(QThread):
             return None
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"获取消息失败 ({talker}): {e}")
+            print(f"获取消息失败 ({talker}): {e}")
             return None
     
     def _is_new_message(self, talker: str, message: Dict) -> bool:
@@ -105,7 +105,6 @@ class MessageListenerThread(QThread):
             # 检查消息发送者是否是指定会话的对方ID
             sender = latest_message.get('senderUsername', '')
             if sender != talker:
-                print(f"忽略消息：发送者 {sender} 不是指定会话的对方ID {talker}")
                 continue
             
             message_id = latest_message.get('localId')
@@ -225,7 +224,7 @@ class MessageListener:
             return None
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"获取消息失败 ({talker}): {e}")
+            print(f"获取消息失败 ({talker}): {e}")
             return None
 
     def _is_new_message(self, talker: str, message: Dict) -> bool:
@@ -261,7 +260,6 @@ class MessageListener:
             # 检查消息发送者是否是指定会话的对方ID
             sender = latest_message.get('senderUsername', '')
             if sender != talker:
-                print(f"忽略消息：发送者 {sender} 不是指定会话的对方ID {talker}")
                 continue
             
             message_id = latest_message.get('localId')

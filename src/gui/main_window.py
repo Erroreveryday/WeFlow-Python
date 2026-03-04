@@ -83,7 +83,7 @@ class ShortcutLineEdit(QLineEdit):
             self.setStyleSheet("ShortcutLineEdit { background-color: #fffacd; }")
             self.setFocus()
             self.grabKeyboard()
-            logging.info("开始录制快捷键...")
+            print("开始录制快捷键...")
     
     def stop_recording(self, success=True):
         self.recording = False
@@ -194,7 +194,7 @@ class ShortcutLineEdit(QLineEdit):
         # 设置新的快捷键
         self.setText(shortcut_str)
         self.stop_recording(success=True)
-        logging.info(f"快捷键已设置为: {shortcut_str}")
+        print(f"快捷键已设置为: {shortcut_str}")
     
     def keyReleaseEvent(self, event):
         if self.recording:
@@ -214,7 +214,7 @@ class ShortcutLineEdit(QLineEdit):
     
     def focusOutEvent(self, event):
         if self.recording:
-            logging.info("失去焦点，停止录制快捷键")
+            print("失去焦点，停止录制快捷键")
             self.stop_recording(success=False)
         super().focusOutEvent(event)
 
@@ -802,7 +802,7 @@ class MainWindow(QMainWindow):
                     logging.info(f"配置保存成功，API端口号: {port}")
                 else:
                     self.status_bar.showMessage("快捷键配置保存成功，API端口号输入无效")
-                logging.info(f"微信快捷键配置已保存: 显示/隐藏={self.show_hide_shortcut.text()}, 发送消息={send_option}")
+                print(f"微信快捷键配置已保存: 显示/隐藏={self.show_hide_shortcut.text()}, 发送消息={send_option}")
             else:
                 self.status_bar.showMessage(f"配置保存失败: {message}")
                 logging.error(f"配置保存失败: {message}")
@@ -840,14 +840,14 @@ class MainWindow(QMainWindow):
             success, message = save_config(self.config)
             
             if success:
-                logging.info(f"微信快捷键配置已保存: 显示/隐藏={self.show_hide_shortcut.text()}, 发送消息={send_option}")
+                print(f"微信快捷键配置已保存: 显示/隐藏={self.show_hide_shortcut.text()}, 发送消息={send_option}")
                 # 更新 keyboard_automation 的配置
                 if self.keyboard_automation:
                     self.keyboard_automation.config = self.config
             else:
-                logging.error(f"快捷键配置保存失败: {message}")
+                print(f"快捷键配置保存失败: {message}")
         except Exception as e:
-            logging.error(f"保存快捷键配置失败: {str(e)}")
+            print(f"保存快捷键配置失败: {str(e)}")
     
     def save_api_port_config(self):
         """保存API端口配置"""
