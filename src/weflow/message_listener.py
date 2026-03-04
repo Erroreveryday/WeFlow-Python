@@ -81,16 +81,14 @@ class MessageListenerThread(QThread):
         if message_id in self.processed_messages:
             return False
         
-        if talker not in self.last_timestamps:
+        last_time = self.last_timestamps.get(talker, 0)
+        
+        if message_time > last_time:
+            # 即使是第一次收到消息，只要是新消息就返回True
             self.last_timestamps[talker] = message_time
             self.last_messages[talker] = message
             self.processed_messages.add(message_id)
             logger.info(f"初始化会话 {talker} 的最新消息，时间戳: {message_time}")
-            return False
-        
-        last_time = self.last_timestamps.get(talker, 0)
-        
-        if message_time > last_time:
             return True
         
         return False
@@ -237,16 +235,14 @@ class MessageListener:
         if message_id in self.processed_messages:
             return False
         
-        if talker not in self.last_timestamps:
+        last_time = self.last_timestamps.get(talker, 0)
+        
+        if message_time > last_time:
+            # 即使是第一次收到消息，只要是新消息就返回True
             self.last_timestamps[talker] = message_time
             self.last_messages[talker] = message
             self.processed_messages.add(message_id)
             logger.info(f"初始化会话 {talker} 的最新消息，时间戳: {message_time}")
-            return False
-        
-        last_time = self.last_timestamps.get(talker, 0)
-        
-        if message_time > last_time:
             return True
         
         return False
