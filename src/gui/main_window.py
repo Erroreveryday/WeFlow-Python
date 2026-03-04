@@ -1,6 +1,7 @@
 import sys
 import os
 import logging
+from datetime import datetime
 
 # 添加src目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -9,6 +10,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHB
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, Q_ARG, QCoreApplication, QTimer
 from PyQt5.QtGui import QFont, QKeyEvent, QKeySequence
 from weflow.status_checker import test_api_health, check_weixin_status
+from weflow.message_listener import MessageListenerThread
 from utils import load_config, save_config
 
 # 自定义快捷键输入控件
@@ -231,6 +233,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config = None
+        self.message_listener = None
+        self.is_loading_sessions = False  # 标志：是否正在加载会话
         self.init_ui()
         self.setup_logger()
         self.show()
@@ -261,10 +265,53 @@ class MainWindow(QMainWindow):
         self.status_timer.start(5000)
         # 立即执行一次检查
         self.auto_check_status()
+        
+        # 延迟启动消息监听器，减少图形界面唤起时间
+        QTimer.singleShot(500, self.start_message_listener)
+        
         print("延迟初始化完成")
+    
+    def start_message_listener(self):
+        """启动消息监听器"""
+        try:
+            self.message_listener = MessageListenerThread(check_interval=5)
+            self.message_listener.new_message.connect(self.on_new_message)
+            self.message_listener.start()
+            logging.info("消息监听器已启动")
+        except Exception as e:
+            logging.error(f"启动消息监听器失败: {e}")
+    
+    def on_new_message(self, session: dict, message: dict):
+        """处理新消息"""
+        contact_remark = session.get('contact_remark', '未知')
+        content = message.get('content', '')
+        sender = message.get('senderUsername', '')
+        create_time = message.get('createTime', 0)
+        
+        # 判断时间戳是秒级还是毫秒级
+        if create_time > 10000000000:  # 毫秒级时间戳（大于 2286 年）
+            timestamp = datetime.fromtimestamp(create_time / 1000).strftime('%Y-%m-%d %H:%M:%S')
+        else:  # 秒级时间戳
+            timestamp = datetime.fromtimestamp(create_time).strftime('%Y-%m-%d %H:%M:%S')
+        
+        logging.info(f"=== 新消息通知 ===")
+        logging.info(f"会话: {contact_remark}")
+        logging.info(f"发送者: {sender}")
+        logging.info(f"时间: {timestamp}")
+        logging.info(f"内容: {content}")
+        logging.info(f"==================")
     
     def load_wechat_sessions(self):
         """加载微信会话配置到表格"""
+        # 先断开信号连接，避免重复触发
+        try:
+            self.sessions_table.itemChanged.disconnect(self.on_cell_changed)
+        except:
+            pass
+        
+        # 设置加载标志
+        self.is_loading_sessions = True
+        
         sessions = self.config.get('wechat_sessions', [])
         self.sessions_table.setRowCount(len(sessions))
         
@@ -312,6 +359,9 @@ class MainWindow(QMainWindow):
                 item = QTableWidgetItem()
                 item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
                 self.sessions_table.setItem(row, col, item)
+        
+        # 清除加载标志
+        self.is_loading_sessions = False
     
     def showEvent(self, event):
         """窗口显示事件"""
@@ -319,6 +369,20 @@ class MainWindow(QMainWindow):
         # 窗口显示后连接屏幕切换信号
         if self.windowHandle():
             self.windowHandle().screenChanged.connect(self.on_screen_changed)
+    
+    def closeEvent(self, event):
+        """窗口关闭事件"""
+        # 停止消息监听器
+        if self.message_listener and self.message_listener.isRunning():
+            logging.info("正在停止消息监听器...")
+            self.message_listener.stop()
+            logging.info("消息监听器已停止")
+        
+        # 停止状态检查定时器
+        if hasattr(self, 'status_timer'):
+            self.status_timer.stop()
+        
+        super().closeEvent(event)
     
     def init_ui(self):
         self.setWindowTitle("WeFlow-Python")
@@ -694,6 +758,10 @@ class MainWindow(QMainWindow):
                 item = QTableWidgetItem()
                 item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
                 self.sessions_table.setItem(row, col, item)
+            # 重新加载监听器配置
+            if self.message_listener:
+                self.message_listener.reload_config()
+                logging.info("监听器配置已重新加载")
         else:
             self.status_bar.showMessage(f"会话添加失败: {message}")
             logging.error(f"会话添加失败: {message}")
@@ -724,6 +792,10 @@ class MainWindow(QMainWindow):
     
     def on_cell_changed(self, item):
         """处理单元格变化事件"""
+        # 如果正在加载会话，不处理
+        if self.is_loading_sessions:
+            return
+        
         row = item.row()
         column = item.column()
         value = item.text()
@@ -762,6 +834,10 @@ class MainWindow(QMainWindow):
             success, message = save_config(self.config)
             if success:
                 logging.info(f"会话配置已更新")
+                # 重新加载监听器配置
+                if self.message_listener:
+                    self.message_listener.reload_config()
+                    logging.info("监听器配置已重新加载")
             else:
                 logging.error(f"保存配置失败: {message}")
     
@@ -782,6 +858,10 @@ class MainWindow(QMainWindow):
                 logging.info(f"自动回复状态已更新")
                 # 重新加载会话列表以更新UI
                 self.load_wechat_sessions()
+                # 重新加载监听器配置
+                if self.message_listener:
+                    self.message_listener.reload_config()
+                    logging.info("监听器配置已重新加载")
             else:
                 logging.error(f"保存配置失败: {message}")
     
@@ -819,6 +899,10 @@ class MainWindow(QMainWindow):
                 self.status_bar.showMessage("会话删除成功")
                 logging.info("会话删除成功")
                 self.load_wechat_sessions()
+                # 重新加载监听器配置
+                if self.message_listener:
+                    self.message_listener.reload_config()
+                    logging.info("监听器配置已重新加载")
             else:
                 self.status_bar.showMessage(f"会话删除失败: {message}")
                 logging.error(f"会话删除失败: {message}")
