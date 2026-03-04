@@ -31,8 +31,7 @@ def load_config(config_file='config.json'):
                 "switch_session": "Ctrl+2",
                 "search": "Ctrl+F",
                 "select": "Enter",
-                "paste": "Ctrl+V",
-                "send": "Enter"
+                "paste": "Ctrl+V"
             },
             "ai": {
                 "provider": "aliyun",
@@ -83,8 +82,7 @@ def load_config(config_file='config.json'):
                 "switch_session": "Ctrl+2",
                 "search": "Ctrl+F",
                 "select": "Enter",
-                "paste": "Ctrl+V",
-                "send": "Ctrl+Enter"
+                "paste": "Ctrl+V"
             },
             "ai": {
                 "provider": "aliyun",

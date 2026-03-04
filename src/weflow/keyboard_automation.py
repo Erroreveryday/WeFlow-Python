@@ -183,7 +183,7 @@ class KeyboardAutomation:
             search_shortcut = self._get_shortcut('search', 'Ctrl+F')
             select_shortcut = self._get_shortcut('select', 'Enter')
             paste_shortcut = self._get_shortcut('paste', 'Ctrl+V')
-            send_shortcut = self._get_shortcut('send', 'Ctrl+Enter')
+            send_shortcut = self._get_shortcut('send_message', 'Enter')
 
             self.logger.info(f"快捷键配置: 切换会话={switch_session_shortcut}, 搜索={search_shortcut}, "
                            f"选中={select_shortcut}, 粘贴={paste_shortcut}, 发送={send_shortcut}")

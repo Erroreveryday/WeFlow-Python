@@ -781,8 +781,7 @@ class MainWindow(QMainWindow):
                 'switch_session': 'Ctrl+2',
                 'search': 'Ctrl+F',
                 'select': 'Enter',
-                'paste': 'Ctrl+V',
-                'send': 'Enter'
+                'paste': 'Ctrl+V'
             }
             for key, default_value in default_shortcuts.items():
                 if key not in self.config['wechat_shortcuts']:
