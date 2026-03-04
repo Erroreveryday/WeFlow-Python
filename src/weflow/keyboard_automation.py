@@ -125,8 +125,7 @@ class KeyboardAutomation:
         5. 快捷键 Ctrl+F (搜索)
         6. 粘贴所选会话的联系人备注
         7. 快捷键 Enter (选中搜索结果)
-        8. 快速执行2次显示/隐藏微信窗口快捷键（1秒内完成）
-        9. 输入测试文本"这是一条测试消息"
+        8. 输入测试文本"这是一条测试消息"
         """
         try:
             self.logger.info("开始执行测试消息发送流程")
@@ -212,13 +211,7 @@ class KeyboardAutomation:
                 return False
             time.sleep(0.3)
 
-            # 12. 快速执行2次显示/隐藏微信窗口快捷键
-            self.logger.info("快速执行2次显示/隐藏微信窗口快捷键")
-            for i in range(2):
-                if not self.press_shortcut(show_hide_shortcut):
-                    self.logger.error(f"执行第{i+1}次显示/隐藏窗口快捷键失败")
-                    return False
-                time.sleep(0.2)
+
 
             # 13. 粘贴测试消息
             test_message = "这是一条测试消息"
