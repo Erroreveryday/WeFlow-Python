@@ -27,7 +27,12 @@ def load_config(config_file='config.json'):
             ],
             "wechat_shortcuts": {
                 "show_hide_window": "Ctrl+Alt+W",
-                "send_message": "Enter"
+                "send_message": "Enter",
+                "switch_session": "Ctrl+2",
+                "search": "Ctrl+F",
+                "select": "Enter",
+                "paste": "Ctrl+V",
+                "send": "Enter"
             },
             "ai": {
                 "provider": "aliyun",
@@ -74,7 +79,12 @@ def load_config(config_file='config.json'):
             ],
             "wechat_shortcuts": {
                 "show_hide_window": "Ctrl+Alt+W",
-                "send_message": "Enter"
+                "send_message": "Enter",
+                "switch_session": "Ctrl+2",
+                "search": "Ctrl+F",
+                "select": "Enter",
+                "paste": "Ctrl+V",
+                "send": "Ctrl+Enter"
             },
             "ai": {
                 "provider": "aliyun",

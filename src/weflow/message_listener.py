@@ -15,32 +15,22 @@ logger = logging.getLogger(__name__)
 
 
 class MessageListenerThread(QThread):
-    """
-    会话消息监听器线程
-    在独立线程中运行，不阻塞 GUI
-    """
-    
     new_message = pyqtSignal(dict, dict)
-    
+    message_processed = pyqtSignal(str, dict)
+
     def __init__(self, check_interval: int = 1, base_url: Optional[str] = None):
-        """
-        初始化监听器线程
-        
-        Args:
-            check_interval: 检查间隔时间（秒），默认 1 秒
-            base_url: WeFlow API 基础地址，默认从配置文件读取
-        """
         super().__init__()
         self.check_interval = check_interval
         self.base_url = base_url
         self.last_messages: Dict[str, Dict] = {}
+        self.last_timestamps: Dict[str, int] = {}
         self.is_running = False
         self.enabled_sessions: List[Dict] = []
+        self.processed_messages: set = set()
         
         self._init_config()
     
     def _init_config(self):
-        """初始化配置"""
         config = load_config()
         port = config.get('weflow_api_port', 5031)
         self.base_url = self.base_url or f"http://127.0.0.1:{port}"
@@ -48,7 +38,6 @@ class MessageListenerThread(QThread):
         logger.info(f"监听器线程初始化完成，API地址: {self.base_url}")
     
     def _load_enabled_sessions(self, config: Dict):
-        """从配置文件加载启用的会话"""
         self.enabled_sessions = []
         sessions = config.get('wechat_sessions', [])
         
@@ -62,15 +51,6 @@ class MessageListenerThread(QThread):
         logger.info(f"共启用 {len(self.enabled_sessions)} 个会话监听")
     
     def _get_latest_message(self, talker: str) -> Optional[Dict]:
-        """
-        获取指定会话的最新消息
-        
-        Args:
-            talker: 会话 ID
-        
-        Returns:
-            最新消息字典，如果获取失败返回 None
-        """
         try:
             params = {
                 'talker': talker,
@@ -94,8 +74,28 @@ class MessageListenerThread(QThread):
             logger.error(f"获取消息失败 ({talker}): {e}")
             return None
     
+    def _is_new_message(self, talker: str, message: Dict) -> bool:
+        message_id = message.get('localId')
+        message_time = message.get('createTime', 0)
+        
+        if message_id in self.processed_messages:
+            return False
+        
+        if talker not in self.last_timestamps:
+            self.last_timestamps[talker] = message_time
+            self.last_messages[talker] = message
+            self.processed_messages.add(message_id)
+            logger.info(f"初始化会话 {talker} 的最新消息，时间戳: {message_time}")
+            return False
+        
+        last_time = self.last_timestamps.get(talker, 0)
+        
+        if message_time > last_time:
+            return True
+        
+        return False
+    
     def _check_new_messages(self):
-        """检查所有启用会话的新消息"""
         for session in self.enabled_sessions:
             talker = session.get('wechat_id', '')
             if not talker:
@@ -107,23 +107,22 @@ class MessageListenerThread(QThread):
                 continue
             
             message_id = latest_message.get('localId')
+            message_time = latest_message.get('createTime', 0)
             
-            if talker not in self.last_messages:
-                self.last_messages[talker] = latest_message
-                logger.info(f"初始化会话 {talker} 的最新消息 ID: {message_id}")
-                continue
-            
-            last_message_id = self.last_messages[talker].get('localId')
-            
-            if message_id > last_message_id:
-                logger.info(f"检测到新消息！会话: {talker}, 消息 ID: {message_id}")
+            if self._is_new_message(talker, latest_message):
+                logger.info(f"检测到新消息！会话: {talker}, 消息ID: {message_id}, 时间戳: {message_time}")
                 
                 self.last_messages[talker] = latest_message
+                self.last_timestamps[talker] = message_time
+                self.processed_messages.add(message_id)
+                
+                if len(self.processed_messages) > 1000:
+                    self.processed_messages = set(list(self.processed_messages)[-500:])
                 
                 self.new_message.emit(session, latest_message)
+                self.message_processed.emit(talker, latest_message)
     
     def run(self):
-        """线程运行方法"""
         self.is_running = True
         logger.info("开始监听新消息...")
         
@@ -136,47 +135,52 @@ class MessageListenerThread(QThread):
             time.sleep(self.check_interval)
     
     def stop(self):
-        """停止监听"""
         self.is_running = False
         self.wait()
         logger.info("停止监听新消息")
     
     def reload_config(self):
-        """重新加载配置文件"""
         config = load_config()
         self._load_enabled_sessions(config)
         port = config.get('weflow_api_port', 5031)
         self.base_url = f"http://127.0.0.1:{port}"
-        # 清空历史消息记录，以便重新初始化监听的会话
         self.last_messages = {}
+        self.last_timestamps = {}
+        self.processed_messages = set()
         logger.info("配置已重新加载，历史消息记录已清空")
+
+    def update_processed_message(self, talker: str, message_id: int, message_time: int):
+        """
+        更新已处理消息记录，防止重复处理同一条消息
+        """
+        if talker not in self.last_timestamps:
+            self.last_timestamps[talker] = message_time
+        
+        if message_time >= self.last_timestamps.get(talker, 0):
+            self.last_timestamps[talker] = message_time
+        
+        self.processed_messages.add(message_id)
+        
+        if talker in self.last_messages:
+            last_msg = self.last_messages[talker]
+            if last_msg.get('localId') != message_id:
+                self.last_messages[talker] = {'localId': message_id, 'createTime': message_time}
 
 
 class MessageListener:
-    """
-    会话消息监听器
-    监听配置文件中启用的会话（auto_reply: true），检测新消息并触发回调
-    """
-
     def __init__(self, check_interval: int = 5, base_url: Optional[str] = None):
-        """
-        初始化监听器
-
-        Args:
-            check_interval: 检查间隔时间（秒），默认 5 秒
-            base_url: WeFlow API 基础地址，默认从配置文件读取
-        """
         self.check_interval = check_interval
         self.base_url = base_url
         self.last_messages: Dict[str, Dict] = {}
+        self.last_timestamps: Dict[str, int] = {}
         self.is_running = False
         self.message_callbacks: List[Callable] = []
         self.enabled_sessions: List[Dict] = []
+        self.processed_messages: set = set()
         
         self._init_config()
 
     def _init_config(self):
-        """初始化配置"""
         config = load_config()
         port = config.get('weflow_api_port', 5031)
         self.base_url = self.base_url or f"http://127.0.0.1:{port}"
@@ -184,7 +188,6 @@ class MessageListener:
         logger.info(f"监听器初始化完成，API地址: {self.base_url}")
 
     def _load_enabled_sessions(self, config: Dict):
-        """从配置文件加载启用的会话"""
         self.enabled_sessions = []
         sessions = config.get('wechat_sessions', [])
         
@@ -198,15 +201,6 @@ class MessageListener:
         logger.info(f"共启用 {len(self.enabled_sessions)} 个会话监听")
 
     def _get_latest_message(self, talker: str) -> Optional[Dict]:
-        """
-        获取指定会话的最新消息
-
-        Args:
-            talker: 会话 ID
-
-        Returns:
-            最新消息字典，如果获取失败返回 None
-        """
         try:
             params = {
                 'talker': talker,
@@ -230,8 +224,28 @@ class MessageListener:
             logger.error(f"获取消息失败 ({talker}): {e}")
             return None
 
+    def _is_new_message(self, talker: str, message: Dict) -> bool:
+        message_id = message.get('localId')
+        message_time = message.get('createTime', 0)
+        
+        if message_id in self.processed_messages:
+            return False
+        
+        if talker not in self.last_timestamps:
+            self.last_timestamps[talker] = message_time
+            self.last_messages[talker] = message
+            self.processed_messages.add(message_id)
+            logger.info(f"初始化会话 {talker} 的最新消息，时间戳: {message_time}")
+            return False
+        
+        last_time = self.last_timestamps.get(talker, 0)
+        
+        if message_time > last_time:
+            return True
+        
+        return False
+
     def _check_new_messages(self):
-        """检查所有启用会话的新消息"""
         for session in self.enabled_sessions:
             talker = session.get('wechat_id', '')
             if not talker:
@@ -243,29 +257,21 @@ class MessageListener:
                 continue
             
             message_id = latest_message.get('localId')
+            message_time = latest_message.get('createTime', 0)
             
-            if talker not in self.last_messages:
-                self.last_messages[talker] = latest_message
-                logger.info(f"初始化会话 {talker} 的最新消息 ID: {message_id}")
-                continue
-            
-            last_message_id = self.last_messages[talker].get('localId')
-            
-            if message_id > last_message_id:
-                logger.info(f"检测到新消息！会话: {talker}, 消息 ID: {message_id}")
+            if self._is_new_message(talker, latest_message):
+                logger.info(f"检测到新消息！会话: {talker}, 消息ID: {message_id}, 时间戳: {message_time}")
                 
                 self.last_messages[talker] = latest_message
+                self.last_timestamps[talker] = message_time
+                self.processed_messages.add(message_id)
+                
+                if len(self.processed_messages) > 1000:
+                    self.processed_messages = set(list(self.processed_messages)[-500:])
                 
                 self._trigger_callbacks(session, latest_message)
 
     def _trigger_callbacks(self, session: Dict, message: Dict):
-        """
-        触发所有注册的回调函数
-
-        Args:
-            session: 会话信息
-            message: 新消息内容
-        """
         for callback in self.message_callbacks:
             try:
                 callback(session, message)
@@ -273,28 +279,15 @@ class MessageListener:
                 logger.error(f"回调函数执行失败: {e}")
 
     def add_callback(self, callback: Callable):
-        """
-        添加新消息回调函数
-
-        Args:
-            callback: 回调函数，接收两个参数 (session, message)
-        """
         self.message_callbacks.append(callback)
         logger.info(f"已添加回调函数，当前共有 {len(self.message_callbacks)} 个回调")
 
     def remove_callback(self, callback: Callable):
-        """
-        移除回调函数
-
-        Args:
-            callback: 要移除的回调函数
-        """
         if callback in self.message_callbacks:
             self.message_callbacks.remove(callback)
             logger.info(f"已移除回调函数，当前共有 {len(self.message_callbacks)} 个回调")
 
     def start(self):
-        """启动监听"""
         if self.is_running:
             logger.warning("监听器已在运行中")
             return
@@ -311,27 +304,21 @@ class MessageListener:
             time.sleep(self.check_interval)
 
     def stop(self):
-        """停止监听"""
         self.is_running = False
         logger.info("停止监听新消息")
 
     def reload_config(self):
-        """重新加载配置文件"""
         config = load_config()
         self._load_enabled_sessions(config)
         port = config.get('weflow_api_port', 5031)
         self.base_url = f"http://127.0.0.1:{port}"
+        self.last_messages = {}
+        self.last_timestamps = {}
+        self.processed_messages = set()
         logger.info("配置已重新加载")
 
 
 def example_callback(session: Dict, message: Dict):
-    """
-    示例回调函数
-    
-    Args:
-        session: 会话信息
-        message: 新消息内容
-    """
     contact_remark = session.get('contact_remark', '未知')
     content = message.get('content', '')
     sender = message.get('senderUsername', '')

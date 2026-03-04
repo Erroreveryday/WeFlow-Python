@@ -11,7 +11,33 @@ from PyQt5.QtCore import QThread, pyqtSignal, Qt, Q_ARG, QCoreApplication, QTime
 from PyQt5.QtGui import QFont, QKeyEvent, QKeySequence
 from weflow.status_checker import test_api_health, check_weixin_status
 from weflow.message_listener import MessageListenerThread
+from weflow.keyboard_automation import KeyboardAutomation
 from utils import load_config, save_config
+
+
+class TestMessageThread(QThread):
+    """执行测试消息的后台线程"""
+    finished = pyqtSignal(bool, str)
+    
+    def __init__(self, keyboard_automation, session):
+        super().__init__()
+        self.keyboard_automation = keyboard_automation
+        self.session = session
+    
+    def run(self):
+        try:
+            contact_remark = self.session.get('contact_remark', '')
+            if not contact_remark:
+                self.finished.emit(False, "会话备注为空")
+                return
+            
+            success = self.keyboard_automation.execute_test_message(contact_remark)
+            if success:
+                self.finished.emit(True, "测试消息流程执行成功")
+            else:
+                self.finished.emit(False, "测试消息流程执行失败")
+        except Exception as e:
+            self.finished.emit(False, f"执行出错: {str(e)}")
 
 # 自定义快捷键输入控件
 class ShortcutLineEdit(QLineEdit):
@@ -234,6 +260,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.config = None
         self.message_listener = None
+        self.keyboard_automation = None
         self.is_loading_sessions = False  # 标志：是否正在加载会话
         self.init_ui()
         self.setup_logger()
@@ -246,6 +273,8 @@ class MainWindow(QMainWindow):
         """延迟初始化：加载配置、加载会话、启动状态检查"""
         print("开始延迟初始化...")
         self.config = load_config()
+        
+        self.keyboard_automation = KeyboardAutomation(self.config)
         
         # 更新界面控件的值以匹配配置
         self.show_hide_shortcut.setText(self.config.get('wechat_shortcuts', {}).get('show_hide_window', 'Ctrl+Alt+W'))
@@ -300,6 +329,63 @@ class MainWindow(QMainWindow):
         logging.info(f"时间: {timestamp}")
         logging.info(f"内容: {content}")
         logging.info(f"==================")
+        
+        # 执行测试消息流程
+        self.execute_test_message_flow(session)
+    
+    def execute_test_message_flow(self, session: dict):
+        """执行测试消息流程（在后台线程中执行）"""
+        try:
+            contact_remark = session.get('contact_remark', '')
+            if not contact_remark:
+                logging.warning("会话备注为空，无法执行测试消息流程")
+                return
+            
+            if self.keyboard_automation:
+                # 使用后台线程执行，避免阻塞UI
+                self.test_message_thread = TestMessageThread(self.keyboard_automation, session)
+                self.test_message_thread.finished.connect(self.on_test_message_finished)
+                self.test_message_thread.start()
+                logging.info("已启动后台线程执行测试消息流程")
+            else:
+                logging.error("键盘自动化对象未初始化")
+        except Exception as e:
+            logging.error(f"执行测试消息流程时出错: {e}")
+    
+    def on_test_message_finished(self, success: bool, message: str):
+        """测试消息执行完成回调"""
+        if success:
+            logging.info(message)
+            # 获取最新消息ID并更新到监听器，防止重复处理
+            if self.message_listener:
+                try:
+                    from utils import load_config
+                    config = load_config()
+                    sessions = config.get('wechat_sessions', [])
+                    for session in sessions:
+                        if session.get('auto_reply', False):
+                            talker = session.get('wechat_id', '')
+                            if talker:
+                                # 获取最新消息
+                                import requests
+                                port = config.get('weflow_api_port', 5031)
+                                response = requests.get(
+                                    f"http://127.0.0.1:{port}/api/v1/messages",
+                                    params={'talker': talker, 'limit': 1},
+                                    timeout=10
+                                )
+                                if response.status_code == 200:
+                                    data = response.json()
+                                    if data.get('success') and data.get('messages'):
+                                        latest_msg = data['messages'][0]
+                                        self.message_listener.update_processed_message(
+                                            talker,
+                                            latest_msg.get('localId', 0),
+                                            latest_msg.get('createTime', 0)
+                                        )
+                                        logging.info(f"已更新监听器最新消息ID: {latest_msg.get('localId')}")
+                except Exception as e:
+                    logging.error(f"更新监听器消息记录失败: {e}")
     
     def load_wechat_sessions(self):
         """加载微信会话配置到表格"""
@@ -688,10 +774,27 @@ class MainWindow(QMainWindow):
             send_option = 'Enter' if self.send_message_enter.isChecked() else 'Ctrl+Enter'
             self.config['wechat_shortcuts']['send_message'] = send_option
             
+            # 确保所有快捷键配置项存在
+            default_shortcuts = {
+                'show_hide_window': 'Ctrl+Alt+W',
+                'send_message': 'Enter',
+                'switch_session': 'Ctrl+2',
+                'search': 'Ctrl+F',
+                'select': 'Enter',
+                'paste': 'Ctrl+V',
+                'send': 'Enter'
+            }
+            for key, default_value in default_shortcuts.items():
+                if key not in self.config['wechat_shortcuts']:
+                    self.config['wechat_shortcuts'][key] = default_value
+            
             success, message = save_config(self.config)
             
             if success:
                 logging.info(f"微信快捷键配置已保存: 显示/隐藏={self.show_hide_shortcut.text()}, 发送消息={send_option}")
+                # 更新 keyboard_automation 的配置
+                if self.keyboard_automation:
+                    self.keyboard_automation.config = self.config
             else:
                 logging.error(f"快捷键配置保存失败: {message}")
         except Exception as e:
