@@ -831,6 +831,10 @@ class MainWindow(QMainWindow):
                     success, message = save_config(self.config)
                     if success:
                         logging.info(f"API端口配置已保存: {port}")
+                        # 重新加载监听器配置，确保使用新的端口
+                        if self.message_listener:
+                            self.message_listener.reload_config()
+                            logging.info("监听器配置已重新加载，使用新的API端口")
                     else:
                         logging.error(f"API端口配置保存失败: {message}")
                 else:

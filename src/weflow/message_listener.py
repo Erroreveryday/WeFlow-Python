@@ -47,8 +47,6 @@ class MessageListenerThread(QThread):
                 if wechat_id:
                     self.enabled_sessions.append(session)
                     logger.info(f"启用监听会话: {session.get('contact_remark', wechat_id)} ({wechat_id})")
-        
-        logger.info(f"共启用 {len(self.enabled_sessions)} 个会话监听")
     
     def _get_latest_message(self, talker: str) -> Optional[Dict]:
         try:
@@ -107,7 +105,7 @@ class MessageListenerThread(QThread):
             # 检查消息发送者是否是指定会话的对方ID
             sender = latest_message.get('senderUsername', '')
             if sender != talker:
-                logger.info(f"忽略消息：发送者 {sender} 不是指定会话的对方ID {talker}")
+                print(f"忽略消息：发送者 {sender} 不是指定会话的对方ID {talker}")
                 continue
             
             message_id = latest_message.get('localId')
@@ -207,8 +205,6 @@ class MessageListener:
                 if wechat_id:
                     self.enabled_sessions.append(session)
                     logger.info(f"启用监听会话: {session.get('contact_remark', wechat_id)} ({wechat_id})")
-        
-        logger.info(f"共启用 {len(self.enabled_sessions)} 个会话监听")
 
     def _get_latest_message(self, talker: str) -> Optional[Dict]:
         try:
@@ -267,7 +263,7 @@ class MessageListener:
             # 检查消息发送者是否是指定会话的对方ID
             sender = latest_message.get('senderUsername', '')
             if sender != talker:
-                logger.info(f"忽略消息：发送者 {sender} 不是指定会话的对方ID {talker}")
+                print(f"忽略消息：发送者 {sender} 不是指定会话的对方ID {talker}")
                 continue
             
             message_id = latest_message.get('localId')
