@@ -106,6 +106,12 @@ class MessageListenerThread(QThread):
             if not latest_message:
                 continue
             
+            # 检查消息发送者是否是指定会话的对方ID
+            sender = latest_message.get('senderUsername', '')
+            if sender != talker:
+                logger.info(f"忽略消息：发送者 {sender} 不是指定会话的对方ID {talker}")
+                continue
+            
             message_id = latest_message.get('localId')
             message_time = latest_message.get('createTime', 0)
             
@@ -254,6 +260,12 @@ class MessageListener:
             latest_message = self._get_latest_message(talker)
             
             if not latest_message:
+                continue
+            
+            # 检查消息发送者是否是指定会话的对方ID
+            sender = latest_message.get('senderUsername', '')
+            if sender != talker:
+                logger.info(f"忽略消息：发送者 {sender} 不是指定会话的对方ID {talker}")
                 continue
             
             message_id = latest_message.get('localId')
