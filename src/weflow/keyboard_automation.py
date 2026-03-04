@@ -10,7 +10,7 @@ class KeyboardAutomation:
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger(__name__)
-        pyautogui.PAUSE = 0.5
+        pyautogui.PAUSE = 0.1
         
         self.user32 = ctypes.WinDLL('user32', use_last_error=True)
         self.user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
@@ -56,7 +56,7 @@ class KeyboardAutomation:
             
             # 将窗口置顶并激活
             self.user32.SetForegroundWindow(hwnd)
-            time.sleep(0.5)
+            time.sleep(0.1)
             
             self.logger.info("已激活微信窗口")
             return True
@@ -77,7 +77,7 @@ class KeyboardAutomation:
                 with pyautogui.hold(keys[:-1]):
                     pyautogui.press(keys[-1])
 
-            time.sleep(0.3)
+            time.sleep(0.1)
             return True
         except Exception as e:
             self.logger.error(f"执行快捷键失败: {e}")
@@ -88,7 +88,7 @@ class KeyboardAutomation:
         try:
             self.logger.info(f"输入文本: {text}")
             pyperclip.copy(text)
-            time.sleep(0.1)
+            time.sleep(0.05)
             self.press_shortcut('ctrl+v')
             return True
         except Exception as e:
@@ -102,7 +102,7 @@ class KeyboardAutomation:
             
             # 直接使用窗口句柄激活微信
             self._activate_wechat_window()
-            time.sleep(0.5)
+            time.sleep(0.1)
             
             return True
         except Exception as e:
@@ -162,7 +162,7 @@ class KeyboardAutomation:
                 if not self.press_shortcut(show_hide_shortcut):
                     self.logger.error(f"执行第{i+1}次显示/隐藏窗口快捷键失败")
                     return False
-                time.sleep(0.3)
+                time.sleep(0.1)
 
             # 5. 唤起微信到前台
             if not self._bring_wechat_to_front():
@@ -191,25 +191,25 @@ class KeyboardAutomation:
             if not self.press_shortcut(switch_session_shortcut):
                 self.logger.error("执行切换会话快捷键失败")
                 return False
-            time.sleep(0.3)
+            time.sleep(0.1)
 
             # 9. 搜索
             if not self.press_shortcut(search_shortcut):
                 self.logger.error("执行搜索快捷键失败")
                 return False
-            time.sleep(0.3)
+            time.sleep(0.1)
 
             # 10. 输入联系人备注
             if not self.type_text(session_contact_remark):
                 self.logger.error("输入联系人备注失败")
                 return False
-            time.sleep(0.3)
+            time.sleep(0.1)
 
             # 11. 选中搜索结果
             if not self.press_shortcut(select_shortcut):
                 self.logger.error("执行选中快捷键失败")
                 return False
-            time.sleep(0.3)
+            time.sleep(0.1)
 
 
 
@@ -217,12 +217,12 @@ class KeyboardAutomation:
             test_message = "这是一条测试消息"
             self.logger.info(f"复制消息到剪贴板: {test_message}")
             pyperclip.copy(test_message)
-            time.sleep(0.2)
+            time.sleep(0.05)
 
             if not self.press_shortcut(paste_shortcut):
                 self.logger.error("执行粘贴快捷键失败")
                 return False
-            time.sleep(0.3)
+            time.sleep(0.1)
 
             # 14. 发送消息
             if not self.press_shortcut(send_shortcut):
