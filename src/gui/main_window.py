@@ -284,6 +284,9 @@ class MainWindow(QMainWindow):
             self.send_message_enter.setChecked(True)
         else:
             self.send_message_ctrl_enter.setChecked(True)
+        # 加载发送消息后隐藏窗口配置
+        hide_after_send = self.config.get('wechat_shortcuts', {}).get('hide_after_send', True)
+        self.hide_after_send_checkbox.setChecked(hide_after_send)
         
         self.load_wechat_sessions()
         
@@ -566,12 +569,22 @@ class MainWindow(QMainWindow):
         send_message_layout.addWidget(self.send_message_ctrl_enter)
         send_message_layout.addStretch()
         
+        # 发送消息后隐藏窗口
+        hide_after_send_layout = QHBoxLayout()
+        hide_after_send_label = QLabel("发送消息后隐藏窗口:")
+        self.hide_after_send_checkbox = QCheckBox()
+        self.hide_after_send_checkbox.setChecked(True)  # 默认为启用状态
+        self.hide_after_send_checkbox.stateChanged.connect(self.save_shortcuts_config)
+        hide_after_send_layout.addWidget(hide_after_send_label)
+        hide_after_send_layout.addWidget(self.hide_after_send_checkbox)
+        
         # 提示文本
         tip_label = QLabel("注意：需与微信端的设置保持一致\n详见：微信->设置->快捷键")
         tip_label.setStyleSheet("QLabel { font-size: 12px; color: #666; }")
         
         shortcuts_content_layout.addLayout(show_hide_layout)
         shortcuts_content_layout.addLayout(send_message_layout)
+        shortcuts_content_layout.addLayout(hide_after_send_layout)
         shortcuts_content_layout.addWidget(tip_label)
         shortcuts_group.setLayout(shortcuts_content_layout)
         
@@ -745,6 +758,8 @@ class MainWindow(QMainWindow):
             # 从单选按钮获取发送消息选项
             send_option = 'Enter' if self.send_message_enter.isChecked() else 'Ctrl+Enter'
             self.config['wechat_shortcuts']['send_message'] = send_option
+            # 保存发送消息后隐藏窗口配置
+            self.config['wechat_shortcuts']['hide_after_send'] = self.hide_after_send_checkbox.isChecked()
             
             success, message = save_config(self.config)
             
@@ -773,11 +788,14 @@ class MainWindow(QMainWindow):
             # 从单选按钮获取发送消息选项
             send_option = 'Enter' if self.send_message_enter.isChecked() else 'Ctrl+Enter'
             self.config['wechat_shortcuts']['send_message'] = send_option
+            # 保存发送消息后隐藏窗口配置
+            self.config['wechat_shortcuts']['hide_after_send'] = self.hide_after_send_checkbox.isChecked()
             
             # 确保所有快捷键配置项存在
             default_shortcuts = {
                 'show_hide_window': 'Ctrl+Alt+W',
                 'send_message': 'Enter',
+                'hide_after_send': True,
                 'switch_session': 'Ctrl+2',
                 'search': 'Ctrl+F',
                 'select': 'Enter',

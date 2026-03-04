@@ -229,6 +229,15 @@ class KeyboardAutomation:
                 self.logger.error("执行发送快捷键失败")
                 return False
 
+            # 15. 发送消息后隐藏窗口（如果配置启用）
+            hide_after_send = self.config.get('wechat_shortcuts', {}).get('hide_after_send', True)
+            if hide_after_send:
+                self.logger.info("配置已启用发送消息后隐藏窗口，执行显示/隐藏微信窗口快捷键")
+                show_hide_shortcut = self._get_shortcut('show_hide_window', 'Ctrl+Alt+W')
+                if not self.press_shortcut(show_hide_shortcut):
+                    self.logger.error("执行显示/隐藏窗口快捷键失败")
+                    # 不返回失败，因为消息已经发送成功
+
             self.logger.info("测试消息发送流程执行完成")
             return True
         except Exception as e:
