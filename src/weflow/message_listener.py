@@ -143,6 +143,12 @@ class MessageListenerThread(QThread):
         self.wait()
         logger.info("停止监听新消息")
     
+    def stop_non_blocking(self):
+        """非阻塞方式停止线程"""
+        self.is_running = False
+        # 不调用 wait()，让线程自行结束
+        logger.info("停止监听新消息（非阻塞）")
+    
     def reload_config(self):
         config = load_config()
         self._load_enabled_sessions(config)

@@ -461,16 +461,18 @@ class MainWindow(QMainWindow):
     
     def closeEvent(self, event):
         """窗口关闭事件"""
-        # 停止消息监听器
+        # 停止消息监听器（非阻塞）
         if self.message_listener and self.message_listener.isRunning():
             logging.info("正在停止消息监听器...")
-            self.message_listener.stop()
+            self.message_listener.stop_non_blocking()
             logging.info("消息监听器已停止")
         
         # 停止状态检查定时器
         if hasattr(self, 'status_timer'):
             self.status_timer.stop()
         
+        # 立即关闭窗口，不等待线程结束
+        event.accept()
         super().closeEvent(event)
     
     def init_ui(self):
