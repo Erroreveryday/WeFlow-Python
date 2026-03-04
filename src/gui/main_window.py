@@ -288,6 +288,9 @@ class MainWindow(QMainWindow):
         hide_after_send = self.config.get('wechat_shortcuts', {}).get('hide_after_send', True)
         self.hide_after_send_checkbox.setChecked(hide_after_send)
         
+        # 更新自动回复状态显示
+        self.update_auto_reply_status()
+        
         self.load_wechat_sessions()
         
         # 初始化状态检查定时器
@@ -332,6 +335,16 @@ class MainWindow(QMainWindow):
         logging.info(f"时间: {timestamp}")
         logging.info(f"内容: {content}")
         logging.info(f"==================")
+        
+        # 检查自动回复配置
+        auto_reply_config = self.config.get('auto_reply', {})
+        reply_type = auto_reply_config.get('reply_type', 'fixed')
+        
+        if reply_type == 'fixed':
+            fixed_text = auto_reply_config.get('fixed_text', '').strip()
+            if not fixed_text:
+                logging.warning("自动回复配置为固定文本，但文本内容为空，跳过执行")
+                return
         
         # 执行测试消息流程
         self.execute_test_message_flow(session)
@@ -571,9 +584,9 @@ class MainWindow(QMainWindow):
         send_message_layout.addWidget(self.send_message_ctrl_enter)
         send_message_layout.addStretch()
         
-        # 发送消息后隐藏窗口
+        # 发送消息后隐藏微信窗口
         hide_after_send_layout = QHBoxLayout()
-        hide_after_send_label = QLabel("发送消息后隐藏窗口:")
+        hide_after_send_label = QLabel("发送消息后隐藏微信窗口:")
         self.hide_after_send_checkbox = QCheckBox()
         self.hide_after_send_checkbox.setChecked(True)  # 默认为启用状态
         self.hide_after_send_checkbox.stateChanged.connect(self.save_shortcuts_config)
@@ -631,10 +644,27 @@ class MainWindow(QMainWindow):
         api_content_layout.addLayout(weixin_layout)
         api_group.setLayout(api_content_layout)
         
-        # 添加到右侧布局（从上到下：微信快捷键配置、API端口号配置+API状态、微信状态）
+        # 自动回复配置
+        auto_reply_group = QGroupBox("自动回复配置")
+        auto_reply_layout = QVBoxLayout()
+        
+        self.auto_reply_config_button = QPushButton("点击配置回复内容")
+        self.auto_reply_config_button.clicked.connect(self.open_auto_reply_config)
+        auto_reply_layout.addWidget(self.auto_reply_config_button)
+        
+        # 显示当前自动回复类型
+        self.auto_reply_status_label = QLabel("当前配置: 未设置")
+        self.auto_reply_status_label.setStyleSheet("QLabel { font-size: 12px; color: #666; }")
+        auto_reply_layout.addWidget(self.auto_reply_status_label)
+        
+        auto_reply_group.setLayout(auto_reply_layout)
+        
+        # 添加到右侧布局（从上到下：微信快捷键配置、WeFlow API 配置、自动回复配置）
         wechat_shortcuts_layout.addWidget(shortcuts_group)
         wechat_shortcuts_layout.addSpacing(10)
         wechat_shortcuts_layout.addWidget(api_group)
+        wechat_shortcuts_layout.addSpacing(10)
+        wechat_shortcuts_layout.addWidget(auto_reply_group)
         
         # 添加到左右布局
         wechat_config_layout.addWidget(sessions_group, 2)  # 左边占2份
@@ -1032,6 +1062,48 @@ class MainWindow(QMainWindow):
             else:
                 self.status_bar.showMessage(f"会话删除失败: {message}")
                 logging.error(f"会话删除失败: {message}")
+    
+    def open_auto_reply_config(self):
+        """打开自动回复配置对话框"""
+        # 获取当前自动回复配置
+        auto_reply_config = self.config.get('auto_reply', {})
+        
+        # 打开配置对话框
+        dialog = AutoReplyConfigDialog(self, auto_reply_config)
+        if dialog.exec_() == QDialog.Accepted:
+            # 保存配置
+            new_config = dialog.get_auto_reply_config()
+            self.config['auto_reply'] = new_config
+            
+            success, message = save_config(self.config)
+            if success:
+                self.status_bar.showMessage("自动回复配置保存成功")
+                logging.info("自动回复配置保存成功")
+                # 更新状态显示
+                self.update_auto_reply_status()
+                # 重新加载监听器配置
+                if self.message_listener:
+                    self.message_listener.reload_config()
+                    logging.info("监听器配置已重新加载")
+            else:
+                self.status_bar.showMessage(f"自动回复配置保存失败: {message}")
+                logging.error(f"自动回复配置保存失败: {message}")
+    
+    def update_auto_reply_status(self):
+        """更新自动回复状态显示"""
+        auto_reply_config = self.config.get('auto_reply', {})
+        reply_type = auto_reply_config.get('reply_type', 'fixed')
+        
+        if reply_type == 'fixed':
+            status_text = "当前配置: 回复固定文本"
+        else:
+            provider = auto_reply_config.get('ai_config', {}).get('provider', 'aliyun')
+            if provider == 'aliyun':
+                status_text = "当前配置: AI大模型 (阿里云)"
+            else:
+                status_text = "当前配置: AI大模型 (DeepSeek)"
+        
+        self.auto_reply_status_label.setText(status_text)
 
 class SessionEditDialog(QDialog):
     """提示词编辑对话框"""
@@ -1095,6 +1167,193 @@ class SessionEditDialog(QDialog):
             '其他': self.other_input.text()
         }
         return session_data
+
+
+class AutoReplyConfigDialog(QDialog):
+    """自动回复配置对话框"""
+    def __init__(self, parent, auto_reply_config=None):
+        super().__init__(parent)
+        self.auto_reply_config = auto_reply_config or {
+            'reply_type': 'fixed',  # fixed 或 ai
+            'fixed_text': '',
+            'ai_config': {
+                'provider': 'aliyun',  # aliyun 或 deepseek
+                'aliyun': {
+                    'api_key': '',
+                    'model': 'qwen-turbo'
+                },
+                'deepseek': {
+                    'api_key': '',
+                    'model': 'deepseek-chat'
+                }
+            }
+        }
+        self.init_ui()
+    
+    def init_ui(self):
+        self.setWindowTitle("自动回复配置")
+        self.setGeometry(200, 200, 450, 350)
+        
+        layout = QVBoxLayout()
+        
+        # 自动回复类型选择
+        type_group = QGroupBox("自动回复类型")
+        type_layout = QVBoxLayout()
+        
+        self.fixed_reply_radio = QRadioButton("回复固定文本")
+        self.ai_reply_radio = QRadioButton("调用AI大模型")
+        
+        # 设置默认选项
+        if self.auto_reply_config.get('reply_type') == 'ai':
+            self.ai_reply_radio.setChecked(True)
+        else:
+            self.fixed_reply_radio.setChecked(True)
+        
+        # 连接信号
+        self.fixed_reply_radio.toggled.connect(self.on_reply_type_changed)
+        self.ai_reply_radio.toggled.connect(self.on_reply_type_changed)
+        
+        type_layout.addWidget(self.fixed_reply_radio)
+        type_layout.addWidget(self.ai_reply_radio)
+        type_group.setLayout(type_layout)
+        layout.addWidget(type_group)
+        
+        # 回复固定文本设置
+        self.fixed_text_group = QGroupBox("回复固定文本")
+        fixed_text_layout = QVBoxLayout()
+        
+        self.fixed_text_input = QTextEdit(self.auto_reply_config.get('fixed_text', ''))
+        self.fixed_text_input.setPlaceholderText("请输入固定回复文本")
+        fixed_text_layout.addWidget(self.fixed_text_input)
+        
+        self.fixed_text_group.setLayout(fixed_text_layout)
+        layout.addWidget(self.fixed_text_group)
+        
+        # AI大模型设置
+        self.ai_config_group = QGroupBox("AI大模型配置")
+        ai_config_layout = QVBoxLayout()
+        
+        # AI提供商选择
+        provider_layout = QHBoxLayout()
+        provider_label = QLabel("AI提供商:")
+        self.provider_combo = QComboBox()
+        self.provider_combo.addItems(["阿里云", "DeepSeek"])
+        
+        # 设置默认选项
+        provider = self.auto_reply_config.get('ai_config', {}).get('provider', 'aliyun')
+        if provider == 'deepseek':
+            self.provider_combo.setCurrentIndex(1)
+        else:
+            self.provider_combo.setCurrentIndex(0)
+        
+        self.provider_combo.currentIndexChanged.connect(self.on_provider_changed)
+        provider_layout.addWidget(provider_label)
+        provider_layout.addWidget(self.provider_combo)
+        ai_config_layout.addLayout(provider_layout)
+        
+        # 阿里云配置
+        self.aliyun_group = QGroupBox("阿里云配置")
+        aliyun_layout = QFormLayout()
+        
+        aliyun_config = self.auto_reply_config.get('ai_config', {}).get('aliyun', {})
+        self.aliyun_api_key = QLineEdit(aliyun_config.get('api_key', ''))
+        self.aliyun_api_key.setPlaceholderText("请输入阿里云API密钥")
+        aliyun_layout.addRow("API密钥:", self.aliyun_api_key)
+        
+        self.aliyun_model = QComboBox()
+        self.aliyun_model.addItems(["qwen-turbo", "qwen-plus", "qwen-max"])
+        aliyun_model_value = aliyun_config.get('model', 'qwen-turbo')
+        if aliyun_model_value in ["qwen-turbo", "qwen-plus", "qwen-max"]:
+            self.aliyun_model.setCurrentText(aliyun_model_value)
+        aliyun_layout.addRow("选择模型:", self.aliyun_model)
+        
+        self.aliyun_group.setLayout(aliyun_layout)
+        ai_config_layout.addWidget(self.aliyun_group)
+        
+        # DeepSeek配置
+        self.deepseek_group = QGroupBox("DeepSeek配置")
+        deepseek_layout = QFormLayout()
+        
+        deepseek_config = self.auto_reply_config.get('ai_config', {}).get('deepseek', {})
+        self.deepseek_api_key = QLineEdit(deepseek_config.get('api_key', ''))
+        self.deepseek_api_key.setPlaceholderText("请输入DeepSeek API密钥")
+        deepseek_layout.addRow("API密钥:", self.deepseek_api_key)
+        
+        self.deepseek_model = QComboBox()
+        self.deepseek_model.addItems(["deepseek-chat", "deepseek-r1"])
+        deepseek_model_value = deepseek_config.get('model', 'deepseek-chat')
+        if deepseek_model_value in ["deepseek-chat", "deepseek-r1"]:
+            self.deepseek_model.setCurrentText(deepseek_model_value)
+        deepseek_layout.addRow("选择模型:", self.deepseek_model)
+        
+        self.deepseek_group.setLayout(deepseek_layout)
+        ai_config_layout.addWidget(self.deepseek_group)
+        
+        self.ai_config_group.setLayout(ai_config_layout)
+        layout.addWidget(self.ai_config_group)
+        
+        # 按钮布局
+        button_layout = QHBoxLayout()
+        save_button = QPushButton("保存")
+        save_button.clicked.connect(self.accept)
+        cancel_button = QPushButton("取消")
+        cancel_button.clicked.connect(self.reject)
+        
+        button_layout.addWidget(save_button)
+        button_layout.addWidget(cancel_button)
+        
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+        
+        # 初始状态更新
+        self.on_reply_type_changed()
+        self.on_provider_changed()
+    
+    def on_reply_type_changed(self):
+        """处理回复类型变化"""
+        if self.fixed_reply_radio.isChecked():
+            self.fixed_text_group.setEnabled(True)
+            self.ai_config_group.setEnabled(False)
+        else:
+            self.fixed_text_group.setEnabled(False)
+            self.ai_config_group.setEnabled(True)
+    
+    def on_provider_changed(self):
+        """处理AI提供商变化"""
+        if self.provider_combo.currentIndex() == 0:  # 阿里云
+            self.aliyun_group.setEnabled(True)
+            self.deepseek_group.setEnabled(False)
+        else:  # DeepSeek
+            self.aliyun_group.setEnabled(False)
+            self.deepseek_group.setEnabled(True)
+    
+    def get_auto_reply_config(self):
+        """获取自动回复配置"""
+        config = self.auto_reply_config.copy()
+        
+        # 保存回复类型
+        if self.ai_reply_radio.isChecked():
+            config['reply_type'] = 'ai'
+        else:
+            config['reply_type'] = 'fixed'
+        
+        # 保存回复固定文本
+        config['fixed_text'] = self.fixed_text_input.toPlainText()
+        
+        # 保存AI配置
+        config['ai_config'] = {
+            'provider': 'aliyun' if self.provider_combo.currentIndex() == 0 else 'deepseek',
+            'aliyun': {
+                'api_key': self.aliyun_api_key.text(),
+                'model': self.aliyun_model.currentText()
+            },
+            'deepseek': {
+                'api_key': self.deepseek_api_key.text(),
+                'model': self.deepseek_model.currentText()
+            }
+        }
+        
+        return config
 
 def main():
     # 启用高DPI缩放支持

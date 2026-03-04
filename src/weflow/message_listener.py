@@ -152,10 +152,8 @@ class MessageListenerThread(QThread):
         self._load_enabled_sessions(config)
         port = config.get('weflow_api_port', 5031)
         self.base_url = f"http://127.0.0.1:{port}"
-        self.last_messages = {}
-        self.last_timestamps = {}
-        self.processed_messages = set()
-        logger.info("配置已重新加载，历史消息记录已清空")
+        # 保留已处理的消息记录，避免重复处理
+        logger.info("配置已重新加载，保留历史消息记录")
 
     def update_processed_message(self, talker: str, message_id: int, message_time: int):
         """
@@ -322,10 +320,8 @@ class MessageListener:
         self._load_enabled_sessions(config)
         port = config.get('weflow_api_port', 5031)
         self.base_url = f"http://127.0.0.1:{port}"
-        self.last_messages = {}
-        self.last_timestamps = {}
-        self.processed_messages = set()
-        logger.info("配置已重新加载")
+        # 保留已处理的消息记录，避免重复处理
+        logger.info("配置已重新加载，保留历史消息记录")
 
 
 def example_callback(session: Dict, message: Dict):

@@ -214,7 +214,16 @@ class KeyboardAutomation:
 
 
             # 13. 粘贴测试消息
-            test_message = "这是一条测试消息"
+            # 从配置中获取自动回复文本
+            auto_reply_config = self.config.get('auto_reply', {})
+            reply_type = auto_reply_config.get('reply_type', 'fixed')
+            
+            if reply_type == 'fixed':
+                test_message = auto_reply_config.get('fixed_text', '这是一条测试消息')
+            else:
+                # AI大模型相关代码以后再考虑实现
+                test_message = "这是一条测试消息"
+            
             self.logger.info(f"复制消息到剪贴板: {test_message}")
             pyperclip.copy(test_message)
             time.sleep(0.05)
