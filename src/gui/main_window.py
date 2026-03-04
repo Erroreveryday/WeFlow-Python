@@ -306,7 +306,7 @@ class MainWindow(QMainWindow):
     def start_message_listener(self):
         """启动消息监听器"""
         try:
-            self.message_listener = MessageListenerThread(check_interval=5)
+            self.message_listener = MessageListenerThread(check_interval=1)
             self.message_listener.new_message.connect(self.on_new_message)
             self.message_listener.start()
             logging.info("消息监听器已启动")
