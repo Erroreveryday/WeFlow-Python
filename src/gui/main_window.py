@@ -1180,11 +1180,13 @@ class AutoReplyConfigDialog(QDialog):
                 'provider': 'aliyun',  # aliyun 或 deepseek
                 'aliyun': {
                     'api_key': '',
-                    'model': 'qwen-turbo'
+                    'model': 'qwen-turbo',
+                    'system_prompt': '你模拟我与对方聊天。'
                 },
                 'deepseek': {
                     'api_key': '',
-                    'model': 'deepseek-chat'
+                    'model': 'deepseek-chat',
+                    'system_prompt': '你模拟我与对方聊天。'
                 }
             }
         }
@@ -1267,6 +1269,11 @@ class AutoReplyConfigDialog(QDialog):
             self.aliyun_model.setCurrentText(aliyun_model_value)
         aliyun_layout.addRow("选择模型:", self.aliyun_model)
         
+        self.aliyun_system_prompt = QTextEdit(aliyun_config.get('system_prompt', '你模拟我与对方聊天。'))
+        self.aliyun_system_prompt.setPlaceholderText("请输入系统提示词")
+        self.aliyun_system_prompt.setMinimumHeight(80)
+        aliyun_layout.addRow("系统提示词:", self.aliyun_system_prompt)
+        
         self.aliyun_group.setLayout(aliyun_layout)
         ai_config_layout.addWidget(self.aliyun_group)
         
@@ -1280,11 +1287,16 @@ class AutoReplyConfigDialog(QDialog):
         deepseek_layout.addRow("API密钥:", self.deepseek_api_key)
         
         self.deepseek_model = QComboBox()
-        self.deepseek_model.addItems(["deepseek-chat", "deepseek-r1"])
+        self.deepseek_model.addItems(["deepseek-chat", "deepseek-reasoner"])
         deepseek_model_value = deepseek_config.get('model', 'deepseek-chat')
-        if deepseek_model_value in ["deepseek-chat", "deepseek-r1"]:
+        if deepseek_model_value in ["deepseek-chat", "deepseek-reasoner"]:
             self.deepseek_model.setCurrentText(deepseek_model_value)
         deepseek_layout.addRow("选择模型:", self.deepseek_model)
+        
+        self.deepseek_system_prompt = QTextEdit(deepseek_config.get('system_prompt', '你模拟我与对方聊天。'))
+        self.deepseek_system_prompt.setPlaceholderText("请输入系统提示词")
+        self.deepseek_system_prompt.setMinimumHeight(80)
+        deepseek_layout.addRow("系统提示词:", self.deepseek_system_prompt)
         
         self.deepseek_group.setLayout(deepseek_layout)
         ai_config_layout.addWidget(self.deepseek_group)
@@ -1345,11 +1357,13 @@ class AutoReplyConfigDialog(QDialog):
             'provider': 'aliyun' if self.provider_combo.currentIndex() == 0 else 'deepseek',
             'aliyun': {
                 'api_key': self.aliyun_api_key.text(),
-                'model': self.aliyun_model.currentText()
+                'model': self.aliyun_model.currentText(),
+                'system_prompt': self.aliyun_system_prompt.toPlainText()
             },
             'deepseek': {
                 'api_key': self.deepseek_api_key.text(),
-                'model': self.deepseek_model.currentText()
+                'model': self.deepseek_model.currentText(),
+                'system_prompt': self.deepseek_system_prompt.toPlainText()
             }
         }
         

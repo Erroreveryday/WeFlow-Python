@@ -39,10 +39,12 @@ def load_config(config_file='config.json'):
                 "api_key": "",
                 "providers": {
                     "aliyun": {
-                        "models": ["qwen3.5-flash", "qwen3.5-plus", "qwen3-max"]
+                        "models": ["qwen3.5-flash", "qwen3.5-plus", "qwen3-max"],
+                        "system_prompt": "你模拟我与对方聊天。"
                     },
                     "deepseek": {
-                        "models": ["deepseek-chat", "deepseek-reasoner"]
+                        "models": ["deepseek-chat", "deepseek-reasoner"],
+                        "system_prompt": "你模拟我与对方聊天。"
                     }
                 }
             }
@@ -89,10 +91,12 @@ def load_config(config_file='config.json'):
                 "api_key": "",
                 "providers": {
                     "aliyun": {
-                        "models": ["qwen3.5-flash", "qwen3.5-plus", "qwen3-max"]
+                        "models": ["qwen3.5-flash", "qwen3.5-plus", "qwen3-max"],
+                        "system_prompt": "你是一个智能助手，需要根据用户的问题提供准确、有用的回答。"
                     },
                     "deepseek": {
-                        "models": ["deepseek-chat", "deepseek-reasoner"]
+                        "models": ["deepseek-chat", "deepseek-reasoner"],
+                        "system_prompt": "你是一个智能助手，需要根据用户的问题提供准确、有用的回答。"
                     }
                 }
             }
