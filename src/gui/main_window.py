@@ -1253,6 +1253,9 @@ class AutoReplyConfigDialog(QDialog):
         provider_layout.addWidget(self.provider_combo)
         ai_config_layout.addLayout(provider_layout)
         
+        # 服务商配置横向布局
+        providers_layout = QHBoxLayout()
+        
         # 阿里云配置
         self.aliyun_group = QGroupBox("阿里云配置")
         aliyun_layout = QFormLayout()
@@ -1275,7 +1278,11 @@ class AutoReplyConfigDialog(QDialog):
         aliyun_layout.addRow("系统提示词:", self.aliyun_system_prompt)
         
         self.aliyun_group.setLayout(aliyun_layout)
-        ai_config_layout.addWidget(self.aliyun_group)
+        self.aliyun_group.setMinimumWidth(300)  # 增加最小宽度
+        providers_layout.addWidget(self.aliyun_group, 1)  # 添加拉伸因子
+        
+        # 添加间距
+        providers_layout.addSpacing(10)
         
         # DeepSeek配置
         self.deepseek_group = QGroupBox("DeepSeek配置")
@@ -1299,7 +1306,10 @@ class AutoReplyConfigDialog(QDialog):
         deepseek_layout.addRow("系统提示词:", self.deepseek_system_prompt)
         
         self.deepseek_group.setLayout(deepseek_layout)
-        ai_config_layout.addWidget(self.deepseek_group)
+        self.deepseek_group.setMinimumWidth(300)  # 增加最小宽度
+        providers_layout.addWidget(self.deepseek_group, 1)  # 添加拉伸因子
+        
+        ai_config_layout.addLayout(providers_layout)
         
         self.ai_config_group.setLayout(ai_config_layout)
         layout.addWidget(self.ai_config_group)
