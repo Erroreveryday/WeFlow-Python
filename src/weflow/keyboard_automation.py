@@ -26,11 +26,30 @@ class KeyboardAutomation:
         self.user32.IsWindowVisible.restype = wintypes.BOOL
         self.user32.IsIconic.argtypes = [wintypes.HWND]
         self.user32.IsIconic.restype = wintypes.BOOL
+        
+        self.ai_stream_callbacks = {
+            'thinking': None,
+            'content': None
+        }
 
     def _get_shortcut(self, key_name, fallback):
         """从配置中获取快捷键，如果不存在则使用默认值"""
         shortcuts = self.config.get('wechat_shortcuts', {})
         return shortcuts.get(key_name, fallback)
+    
+    def set_ai_stream_callbacks(self, thinking_callback=None, content_callback=None, reasoning_finished_callback=None):
+        """
+        设置 AI 流式输出的回调函数
+        
+        Args:
+            thinking_callback: 推理内容流式回调函数
+            content_callback: 最终内容流式回调函数
+            reasoning_finished_callback: 推理完成回调函数
+        """
+        self.ai_stream_callbacks['thinking'] = thinking_callback
+        self.ai_stream_callbacks['content'] = content_callback
+        self.ai_stream_callbacks['reasoning_finished'] = reasoning_finished_callback
+        print(f"AI 流式回调已设置: thinking={thinking_callback is not None}, content={content_callback is not None}, reasoning_finished={reasoning_finished_callback is not None}")
 
     def _get_wechat_window_handle(self):
         """获取微信窗口句柄"""
@@ -160,18 +179,16 @@ class KeyboardAutomation:
                 
                 if provider == 'deepseek':
                     self.logger.info("使用 DeepSeek 模型生成回复...")
-                    deepseek_config = self.config.get('ai', {}).get('providers', {}).get('deepseek', {})
-                    # 首先尝试从 auto_reply.ai_config.deepseek.api_key 读取（GUI配置的位置）
-                    api_key = self.config.get('auto_reply', {}).get('ai_config', {}).get('deepseek', {}).get('api_key', '')
-                    # 如果没有，再尝试从 ai.api_key 读取（旧配置位置）
+                    deepseek_config = ai_config.get('deepseek', {})
+                    self.logger.info(f"DeepSeek配置: {deepseek_config}")
+                    api_key = deepseek_config.get('api_key', '')
                     if not api_key:
                         api_key = self.config.get('ai', {}).get('api_key', '')
-                    # 首先尝试从 auto_reply.ai_config.deepseek.model 读取（GUI配置的位置）
-                    model = self.config.get('auto_reply', {}).get('ai_config', {}).get('deepseek', {}).get('model', 'deepseek-chat')
-                    # 如果没有，再尝试从 ai.model 读取（旧配置位置）
+                    model = deepseek_config.get('model', 'deepseek-chat')
                     if not model:
                         model = self.config.get('ai', {}).get('model', 'deepseek-chat')
                     default_system_prompt = deepseek_config.get('system_prompt', '你模拟我与对方聊天。')
+                    self.logger.info(f"默认系统提示词: {default_system_prompt}")
                     thinking_mode = ai_config.get('thinking_mode', False)
                     temperature = ai_config.get('temperature', 1.3)
                     message_limit = ai_config.get('message_limit', 10)
@@ -188,14 +205,34 @@ class KeyboardAutomation:
                             model=model
                         )
                         
-                        test_message = deepseek_client.get_reply_for_session(
-                            weflow_base_url=weflow_base_url,
-                            session=session,
-                            default_system_prompt=default_system_prompt,
-                            message_limit=message_limit,
-                            thinking_mode=thinking_mode,
-                            temperature=temperature
-                        )
+                        thinking_callback = self.ai_stream_callbacks.get('thinking')
+                        content_callback = self.ai_stream_callbacks.get('content')
+                        reasoning_finished_callback = self.ai_stream_callbacks.get('reasoning_finished')
+                        
+                        has_stream_callback = thinking_callback or content_callback
+                        
+                        if has_stream_callback:
+                            self.logger.info("使用流式输出模式生成 AI 回复...")
+                            test_message = deepseek_client.get_reply_for_session_stream(
+                                weflow_base_url=weflow_base_url,
+                                session=session,
+                                on_thinking_chunk=thinking_callback,
+                                on_content_chunk=content_callback,
+                                on_reasoning_finished=reasoning_finished_callback,
+                                default_system_prompt=default_system_prompt,
+                                message_limit=message_limit,
+                                thinking_mode=thinking_mode,
+                                temperature=temperature
+                            )
+                        else:
+                            test_message = deepseek_client.get_reply_for_session(
+                                weflow_base_url=weflow_base_url,
+                                session=session,
+                                default_system_prompt=default_system_prompt,
+                                message_limit=message_limit,
+                                thinking_mode=thinking_mode,
+                                temperature=temperature
+                            )
                         
                         if not test_message:
                             self.logger.error("生成 AI 回复失败，中止回复流程")
@@ -205,7 +242,7 @@ class KeyboardAutomation:
                     self.logger.warning(f"未支持的 AI 提供商: {provider}，中止回复流程")
                     return False
             
-            self.logger.info(f"最终回复内容: {test_message}")
+            # self.logger.info(f"最终回复内容: {test_message}")
 
             # 4. 获取快捷键配置
             show_hide_shortcut = self._get_shortcut('show_hide_window', 'Ctrl+Alt+W')
@@ -279,7 +316,7 @@ class KeyboardAutomation:
             time.sleep(0.1)
 
             # 13. 粘贴准备好的回复消息
-            self.logger.info(f"复制消息到剪贴板: {test_message}")
+            self.logger.info(f"复制消息到剪贴板")
             pyperclip.copy(test_message)
             time.sleep(0.05)
 

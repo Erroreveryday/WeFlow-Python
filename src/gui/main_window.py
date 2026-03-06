@@ -7,12 +7,75 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QStatusBar, QLineEdit, QTableWidget, QTableWidgetItem, QCheckBox, QDialog, QFormLayout, QComboBox, QGroupBox, QRadioButton
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, Q_ARG, QCoreApplication, QTimer
-from PyQt5.QtGui import QFont, QKeyEvent, QKeySequence
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, Qt, Q_ARG, QCoreApplication, QTimer
+from PyQt5.QtGui import QFont, QKeyEvent, QKeySequence, QTextCursor
 from weflow.status_checker import test_api_health, check_weixin_status
 from weflow.message_listener import MessageListenerThread
 from weflow.keyboard_automation import KeyboardAutomation
 from utils import load_config, save_config
+
+
+class StreamTextEdit(QTextEdit):
+    """支持流式内容更新的文本编辑控件"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.stream_blocks = {}
+        self.setReadOnly(True)
+    
+    @pyqtSlot(str, str, str)
+    def _stream_append(self, stream_id: str, content: str, stream_type: str):
+        """流式追加内容"""
+        if stream_id not in self.stream_blocks:
+            cursor = self.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            self.stream_blocks[stream_id] = {
+                'cursor': cursor,
+                'start_position': cursor.position(),
+                'type': stream_type
+            }
+            
+            prefix = "[深度思考]\n " if stream_type == "thinking" else "[回复]\n "
+            cursor.insertText(f"\n{prefix}")
+            self.stream_blocks[stream_id]['start_position'] = cursor.position()
+        
+        block = self.stream_blocks[stream_id]
+        cursor = block['cursor']
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(content)
+        
+        self.ensureCursorVisible()
+    
+    @pyqtSlot(str)
+    def _stream_finish(self, stream_id: str):
+        """流式输出完成"""
+        if stream_id in self.stream_blocks:
+            block = self.stream_blocks[stream_id]
+            cursor = block['cursor']
+            cursor.movePosition(QTextCursor.End)
+            
+            if block['type'] == "thinking":
+                cursor.insertText("\n\n")
+            else:
+                cursor.insertText("\n")
+            
+            del self.stream_blocks[stream_id]
+            
+            self.ensureCursorVisible()
+    
+    @pyqtSlot(str)
+    def _reasoning_finished(self, stream_id: str):
+        """推理完成，开始回复内容"""
+        if stream_id in self.stream_blocks:
+            block = self.stream_blocks[stream_id]
+            cursor = block['cursor']
+            cursor.movePosition(QTextCursor.End)
+            
+            cursor.insertText("\n\n")
+            
+            del self.stream_blocks[stream_id]
+            
+            self.ensureCursorVisible()
 
 
 class TestMessageThread(QThread):
@@ -224,14 +287,75 @@ class QTextEditLogger(logging.Handler):
         super().__init__()
         self.text_edit = text_edit
         self.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        self.current_stream_content = {}
+        self.current_stream_type = {}
     
     def emit(self, record):
         msg = self.format(record)
-        # 使用QMetaObject.invokeMethod确保在主线程中执行GUI操作
         from PyQt5.QtCore import QMetaObject, Qt
-        # 只调用append方法，不调用ensureCursorVisible()
         QMetaObject.invokeMethod(self.text_edit, "append", Qt.QueuedConnection, 
                                  Q_ARG(str, msg))
+    
+    def stream_update(self, stream_id: str, content: str, stream_type: str = "content"):
+        """
+        流式更新日志内容
+        
+        Args:
+            stream_id: 流式输出的唯一标识符
+            content: 新增的内容
+            stream_type: 流类型 ("thinking" 或 "content")
+        """
+        from PyQt5.QtCore import QMetaObject, Qt
+        
+        if stream_id not in self.current_stream_content:
+            self.current_stream_content[stream_id] = ""
+            self.current_stream_type[stream_type] = stream_type
+        
+        self.current_stream_content[stream_id] += content
+        
+        QMetaObject.invokeMethod(
+            self.text_edit, 
+            "_stream_append", 
+            Qt.QueuedConnection,
+            Q_ARG(str, stream_id),
+            Q_ARG(str, content),
+            Q_ARG(str, stream_type)
+        )
+    
+    def stream_finish(self, stream_id: str):
+        """
+        结束流式输出
+        
+        Args:
+            stream_id: 流式输出的唯一标识符
+        """
+        from PyQt5.QtCore import QMetaObject, Qt
+        
+        if stream_id in self.current_stream_content:
+            del self.current_stream_content[stream_id]
+        
+        QMetaObject.invokeMethod(
+            self.text_edit, 
+            "_stream_finish", 
+            Qt.QueuedConnection,
+            Q_ARG(str, stream_id)
+        )
+    
+    def reasoning_finished(self, stream_id: str):
+        """
+        推理完成，开始回复内容
+        
+        Args:
+            stream_id: 流式输出的唯一标识符
+        """
+        from PyQt5.QtCore import QMetaObject, Qt
+        
+        QMetaObject.invokeMethod(
+            self.text_edit, 
+            "_reasoning_finished", 
+            Qt.QueuedConnection,
+            Q_ARG(str, stream_id)
+        )
 
 # API状态检查线程
 class ApiCheckThread(QThread):
@@ -358,9 +482,29 @@ class MainWindow(QMainWindow):
                 return
             
             if self.keyboard_automation:
-                # 使用后台线程执行，避免阻塞UI
+                stream_id = f"ai_stream_{int(datetime.now().timestamp() * 1000)}"
+                
+                def thinking_callback(chunk):
+                    self.gui_handler.stream_update(stream_id, chunk, "thinking")
+                
+                def content_callback(chunk):
+                    self.gui_handler.stream_update(stream_id, chunk, "content")
+                
+                def reasoning_finished_callback():
+                    self.gui_handler.reasoning_finished(stream_id)
+                
+                self.keyboard_automation.set_ai_stream_callbacks(
+                    thinking_callback=thinking_callback,
+                    content_callback=content_callback,
+                    reasoning_finished_callback=reasoning_finished_callback
+                )
+                
+                def finish_stream(success, message):
+                    self.gui_handler.stream_finish(stream_id)
+                
                 self.test_message_thread = TestMessageThread(self.keyboard_automation, session)
                 self.test_message_thread.finished.connect(self.on_test_message_finished)
+                self.test_message_thread.finished.connect(finish_stream)
                 self.test_message_thread.start()
                 logging.info("已启动后台线程执行测试消息流程")
             else:
@@ -504,8 +648,7 @@ class MainWindow(QMainWindow):
         # 日志输出区域
         log_layout = QVBoxLayout()
         log_label = QLabel("日志输出:")
-        self.log_text_edit = QTextEdit()
-        self.log_text_edit.setReadOnly(True)
+        self.log_text_edit = StreamTextEdit()
         clear_log_button = QPushButton("清空日志")
         clear_log_button.clicked.connect(self.clear_log)
         
@@ -689,8 +832,8 @@ class MainWindow(QMainWindow):
             logger.removeHandler(handler)
         
         # 添加GUI日志处理器
-        gui_handler = QTextEditLogger(self.log_text_edit)
-        logger.addHandler(gui_handler)
+        self.gui_handler = QTextEditLogger(self.log_text_edit)
+        logger.addHandler(self.gui_handler)
         
         # 添加控制台日志处理器
         console_handler = logging.StreamHandler()
@@ -760,6 +903,7 @@ class MainWindow(QMainWindow):
     
     def clear_log(self):
         self.log_text_edit.clear()
+        self.log_text_edit.stream_blocks = {}
         logging.info("日志已清空")
     
     def on_screen_changed(self, screen):
