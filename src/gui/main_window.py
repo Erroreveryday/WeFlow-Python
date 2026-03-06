@@ -31,7 +31,7 @@ class TestMessageThread(QThread):
                 self.finished.emit(False, "会话备注为空")
                 return
             
-            success = self.keyboard_automation.execute_test_message(contact_remark)
+            success = self.keyboard_automation.execute_test_message(self.session)
             if success:
                 self.finished.emit(True, "测试消息流程执行成功")
             else:

@@ -5,6 +5,11 @@ import pyperclip
 import ctypes
 from ctypes import wintypes
 import subprocess
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.deepseek import DeepSeekClient
 
 class KeyboardAutomation:
     def __init__(self, config):
@@ -109,7 +114,7 @@ class KeyboardAutomation:
             self.logger.error(f"唤起微信失败: {e}")
             return False
 
-    def execute_test_message(self, session_contact_remark):
+    def execute_test_message(self, session):
         """
         执行测试消息发送流程
 
@@ -125,11 +130,12 @@ class KeyboardAutomation:
         5. 快捷键 Ctrl+F (搜索)
         6. 粘贴所选会话的联系人备注
         7. 快捷键 Enter (选中搜索结果)
-        8. 输入测试文本"这是一条测试消息"
+        8. 输入回复内容（固定文本或 AI 生成）
         """
         try:
             self.logger.info("开始执行测试消息发送流程")
-
+            session_contact_remark = session.get('contact_remark', '')
+            
             # 1. 立刻重新检测微信状态
             from weflow.status_checker import check_weixin_status
             status_code, status_description = check_weixin_status()
@@ -140,7 +146,68 @@ class KeyboardAutomation:
                 self.logger.error("微信未运行，停止后续所有操作")
                 return False
 
-            # 3. 获取快捷键配置
+            # 3. 先准备好回复内容（这样后面可以快速执行键盘操作）
+            auto_reply_config = self.config.get('auto_reply', {})
+            reply_type = auto_reply_config.get('reply_type', 'fixed')
+            
+            if reply_type == 'fixed':
+                test_message = auto_reply_config.get('fixed_text', '这是一条测试消息')
+                self.logger.info(f"使用固定文本回复: {test_message}")
+            else:
+                # 使用 AI 大模型生成回复
+                ai_config = auto_reply_config.get('ai_config', {})
+                provider = ai_config.get('provider', 'deepseek')
+                
+                if provider == 'deepseek':
+                    self.logger.info("使用 DeepSeek 模型生成回复...")
+                    deepseek_config = self.config.get('ai', {}).get('providers', {}).get('deepseek', {})
+                    # 首先尝试从 auto_reply.ai_config.deepseek.api_key 读取（GUI配置的位置）
+                    api_key = self.config.get('auto_reply', {}).get('ai_config', {}).get('deepseek', {}).get('api_key', '')
+                    # 如果没有，再尝试从 ai.api_key 读取（旧配置位置）
+                    if not api_key:
+                        api_key = self.config.get('ai', {}).get('api_key', '')
+                    # 首先尝试从 auto_reply.ai_config.deepseek.model 读取（GUI配置的位置）
+                    model = self.config.get('auto_reply', {}).get('ai_config', {}).get('deepseek', {}).get('model', 'deepseek-chat')
+                    # 如果没有，再尝试从 ai.model 读取（旧配置位置）
+                    if not model:
+                        model = self.config.get('ai', {}).get('model', 'deepseek-chat')
+                    default_system_prompt = deepseek_config.get('system_prompt', '你模拟我与对方聊天。')
+                    thinking_mode = ai_config.get('thinking_mode', False)
+                    temperature = ai_config.get('temperature', 1.3)
+                    message_limit = ai_config.get('message_limit', 10)
+                    
+                    if not api_key:
+                        self.logger.error("DeepSeek API Key 未配置，中止回复流程")
+                        return False
+                    else:
+                        port = self.config.get('weflow_api_port', 5031)
+                        weflow_base_url = f"http://127.0.0.1:{port}"
+                        
+                        deepseek_client = DeepSeekClient(
+                            api_key=api_key,
+                            model=model
+                        )
+                        
+                        test_message = deepseek_client.get_reply_for_session(
+                            weflow_base_url=weflow_base_url,
+                            session=session,
+                            default_system_prompt=default_system_prompt,
+                            message_limit=message_limit,
+                            thinking_mode=thinking_mode,
+                            temperature=temperature
+                        )
+                        
+                        if not test_message:
+                            self.logger.error("生成 AI 回复失败，中止回复流程")
+                            return False
+                else:
+                    # 阿里云等其他提供商暂时不实现
+                    self.logger.warning(f"未支持的 AI 提供商: {provider}，中止回复流程")
+                    return False
+            
+            self.logger.info(f"最终回复内容: {test_message}")
+
+            # 4. 获取快捷键配置
             show_hide_shortcut = self._get_shortcut('show_hide_window', 'Ctrl+Alt+W')
             
             # 根据状态决定显示/隐藏快捷键的执行次数
@@ -156,7 +223,7 @@ class KeyboardAutomation:
 
             self.logger.info(f"根据微信状态 {status_description}，将执行 {toggle_count} 次显示/隐藏微信窗口快捷键")
 
-            # 4. 执行根据状态确定的显示/隐藏次数（仅用于调整微信状态）
+            # 5. 执行根据状态确定的显示/隐藏次数（仅用于调整微信状态）
             for i in range(toggle_count):
                 self.logger.info(f"执行第{i+1}次显示/隐藏微信窗口快捷键")
                 if not self.press_shortcut(show_hide_shortcut):
@@ -164,12 +231,12 @@ class KeyboardAutomation:
                     return False
                 time.sleep(0.1)
 
-            # 5. 唤起微信到前台
+            # 6. 唤起微信到前台
             if not self._bring_wechat_to_front():
                 self.logger.error("唤起微信失败")
                 return False
 
-            # 6. 再次检测状态，确认微信已唤起
+            # 7. 再次检测状态，确认微信已唤起
             status_code, status_description = check_weixin_status()
             self.logger.info(f"唤起后微信状态: {status_description} (状态码: {status_code})")
 
@@ -177,7 +244,7 @@ class KeyboardAutomation:
                 self.logger.error("微信未运行，停止后续所有操作")
                 return False
 
-            # 7. 获取其他快捷键配置
+            # 8. 获取其他快捷键配置
             switch_session_shortcut = self._get_shortcut('switch_session', 'Ctrl+2')
             search_shortcut = self._get_shortcut('search', 'Ctrl+F')
             select_shortcut = self._get_shortcut('select', 'Enter')
@@ -187,43 +254,31 @@ class KeyboardAutomation:
             self.logger.info(f"快捷键配置: 切换会话={switch_session_shortcut}, 搜索={search_shortcut}, "
                            f"选中={select_shortcut}, 粘贴={paste_shortcut}, 发送={send_shortcut}")
 
-            # 8. 执行后续操作：切换会话
+            # 9. 执行后续操作：切换会话
             if not self.press_shortcut(switch_session_shortcut):
                 self.logger.error("执行切换会话快捷键失败")
                 return False
             time.sleep(0.1)
 
-            # 9. 搜索
+            # 10. 搜索
             if not self.press_shortcut(search_shortcut):
                 self.logger.error("执行搜索快捷键失败")
                 return False
             time.sleep(0.1)
 
-            # 10. 输入联系人备注
+            # 11. 输入联系人备注
             if not self.type_text(session_contact_remark):
                 self.logger.error("输入联系人备注失败")
                 return False
             time.sleep(0.1)
 
-            # 11. 选中搜索结果
+            # 12. 选中搜索结果
             if not self.press_shortcut(select_shortcut):
                 self.logger.error("执行选中快捷键失败")
                 return False
             time.sleep(0.1)
 
-
-
-            # 13. 粘贴测试消息
-            # 从配置中获取自动回复文本
-            auto_reply_config = self.config.get('auto_reply', {})
-            reply_type = auto_reply_config.get('reply_type', 'fixed')
-            
-            if reply_type == 'fixed':
-                test_message = auto_reply_config.get('fixed_text', '这是一条测试消息')
-            else:
-                # AI大模型相关代码以后再考虑实现
-                test_message = "这是一条测试消息"
-            
+            # 13. 粘贴准备好的回复消息
             self.logger.info(f"复制消息到剪贴板: {test_message}")
             pyperclip.copy(test_message)
             time.sleep(0.05)
@@ -251,4 +306,6 @@ class KeyboardAutomation:
             return True
         except Exception as e:
             self.logger.error(f"执行测试消息失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
             return False

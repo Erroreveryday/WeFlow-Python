@@ -31,11 +31,22 @@ def load_config(config_file='config.json'):
                 "switch_session": "Ctrl+2",
                 "search": "Ctrl+F",
                 "select": "Enter",
-                "paste": "Ctrl+V"
+                "paste": "Ctrl+V",
+                "hide_after_send": True
+            },
+            "auto_reply": {
+                "reply_type": "fixed",
+                "fixed_text": "这是一条测试消息",
+                "ai_config": {
+                    "provider": "deepseek",
+                    "thinking_mode": False,
+                    "temperature": 1.3,
+                    "message_limit": 10
+                }
             },
             "ai": {
-                "provider": "aliyun",
-                "model": "qwen3.5-flash",
+                "provider": "deepseek",
+                "model": "deepseek-chat",
                 "api_key": "",
                 "providers": {
                     "aliyun": {
@@ -83,20 +94,31 @@ def load_config(config_file='config.json'):
                 "switch_session": "Ctrl+2",
                 "search": "Ctrl+F",
                 "select": "Enter",
-                "paste": "Ctrl+V"
+                "paste": "Ctrl+V",
+                "hide_after_send": True
+            },
+            "auto_reply": {
+                "reply_type": "fixed",
+                "fixed_text": "这是一条测试消息",
+                "ai_config": {
+                    "provider": "deepseek",
+                    "thinking_mode": False,
+                    "temperature": 1.3,
+                    "message_limit": 10
+                }
             },
             "ai": {
-                "provider": "aliyun",
-                "model": "qwen3.5-flash",
+                "provider": "deepseek",
+                "model": "deepseek-chat",
                 "api_key": "",
                 "providers": {
                     "aliyun": {
                         "models": ["qwen3.5-flash", "qwen3.5-plus", "qwen3-max"],
-                        "system_prompt": "你是一个智能助手，需要根据用户的问题提供准确、有用的回答。"
+                        "system_prompt": "你模拟我与对方聊天。"
                     },
                     "deepseek": {
                         "models": ["deepseek-chat", "deepseek-reasoner"],
-                        "system_prompt": "你是一个智能助手，需要根据用户的问题提供准确、有用的回答。"
+                        "system_prompt": "你模拟我与对方聊天。"
                     }
                 }
             }
