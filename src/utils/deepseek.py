@@ -8,6 +8,46 @@ from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_date",
+            "description": "获取当前日期",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_time",
+            "description": "获取当前时间和日期",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        }
+    },
+]
+
+def get_date() -> str:
+    """获取当前日期"""
+    now = datetime.now()
+    return now.strftime("%Y-%m-%d")
+
+def get_time() -> str:
+    """获取当前时间和日期"""
+    now = datetime.now()
+    return now.strftime("%Y-%m-%d %H:%M:%S")
+
+TOOL_CALL_MAP = {
+    "get_date": get_date,
+    "get_time": get_time,
+}
+
 class DeepSeekClient:
     """DeepSeek API 客户端"""
 
@@ -129,7 +169,8 @@ class DeepSeekClient:
         return "\n".join(prompt_parts)
     
     def generate_reply(self, formatted_messages: List[Dict], system_prompt: str, 
-                       thinking_mode: bool = False, temperature: float = 1.3) -> Optional[str]:
+                       thinking_mode: bool = False, temperature: float = 1.3,
+                       enable_tools: bool = True) -> Optional[str]:
         """
         使用 DeepSeek API 生成回复
         
@@ -138,6 +179,7 @@ class DeepSeekClient:
             system_prompt: 系统提示词
             thinking_mode: 是否使用思考模式
             temperature: 温度参数
+            enable_tools: 是否启用工具调用
         
         Returns:
             生成的回复内容，失败返回 None
@@ -168,15 +210,75 @@ class DeepSeekClient:
             if not is_reasoner:
                 request_params["temperature"] = temperature
             
+            if enable_tools:
+                request_params["tools"] = TOOLS
+            
             response = self.client.chat.completions.create(**request_params)
             
             if response and response.choices and len(response.choices) > 0:
                 message = response.choices[0].message
-                reply = message.content
-                if hasattr(message, 'reasoning_content') and message.reasoning_content:
-                    logger.info(f"AI 推理内容: {message.reasoning_content[:200]}...")
-                logger.info(f"AI 回复生成成功: {reply}")
-                return reply
+                tool_calls = message.tool_calls
+                
+                if tool_calls:
+                    logger.info(f"检测到工具调用请求: {[tc.function.name for tc in tool_calls]}")
+                    
+                    if is_reasoner or thinking_mode:
+                        deepseek_messages.append({
+                            "role": "assistant",
+                            "content": message.content if message.content else "",
+                            "reasoning_content": message.reasoning_content if hasattr(message, 'reasoning_content') and message.reasoning_content else None,
+                            "tool_calls": [
+                                {
+                                    "id": tc.id,
+                                    "function": {
+                                        "name": tc.function.name,
+                                        "arguments": tc.function.arguments
+                                    },
+                                    "type": tc.type
+                                }
+                                for tc in tool_calls
+                            ]
+                        })
+                    else:
+                        deepseek_messages.append(message)
+                    
+                    for tool in tool_calls:
+                        tool_function = TOOL_CALL_MAP[tool.function.name]
+                        tool_result = tool_function()
+                        logger.info(f"工具 {tool.function.name} 返回结果: {tool_result}")
+                        
+                        deepseek_messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool.id,
+                            "content": tool_result,
+                        })
+                    
+                    second_request_params = {
+                        "model": self.model,
+                        "messages": deepseek_messages,
+                        "stream": False,
+                        "extra_body": extra_body
+                    }
+                    
+                    if not is_reasoner:
+                        second_request_params["temperature"] = temperature
+                    
+                    second_response = self.client.chat.completions.create(**second_request_params)
+                    
+                    if second_response and second_response.choices and len(second_response.choices) > 0:
+                        second_message = second_response.choices[0].message
+                        reply = second_message.content
+                        if hasattr(second_message, 'reasoning_content') and second_message.reasoning_content:
+                            logger.info(f"AI 推理内容: {second_message.reasoning_content[:200]}...")
+                        logger.info(f"AI 回复生成成功: {reply}")
+                        return reply
+                    return None
+                else:
+                    reply = message.content
+                    if hasattr(message, 'reasoning_content') and message.reasoning_content:
+                        logger.info(f"AI 推理内容: {message.reasoning_content[:200]}...")
+                    logger.info(f"AI 回复生成成功: {reply}")
+                    return reply
             
             return None
         except Exception as e:
@@ -187,7 +289,8 @@ class DeepSeekClient:
                               on_thinking_chunk: Optional[Callable[[str], None]] = None,
                               on_content_chunk: Optional[Callable[[str], None]] = None,
                               on_reasoning_finished: Optional[Callable[[], None]] = None,
-                              thinking_mode: bool = False, temperature: float = 1.3) -> Optional[str]:
+                              thinking_mode: bool = False, temperature: float = 1.3,
+                              enable_tools: bool = True) -> Optional[str]:
         """
         使用 DeepSeek API 流式生成回复
         
@@ -199,6 +302,7 @@ class DeepSeekClient:
             on_reasoning_finished: 推理完成回调函数
             thinking_mode: 是否使用思考模式（对于 deepseek-reasoner 模型自动启用）
             temperature: 温度参数
+            enable_tools: 是否启用工具调用
         
         Returns:
             生成的完整回复内容，失败返回 None
@@ -215,6 +319,7 @@ class DeepSeekClient:
         full_thinking = ""
         full_content = ""
         reasoning_started = False
+        tool_calls_buffer = []
         
         try:
             is_reasoner = "reasoner" in self.model.lower()
@@ -233,10 +338,20 @@ class DeepSeekClient:
             if not is_reasoner:
                 request_params["temperature"] = temperature
             
+            if enable_tools:
+                request_params["tools"] = TOOLS
+            
             response = self.client.chat.completions.create(**request_params)
             
             for chunk in response:
                 delta = chunk.choices[0].delta
+                
+                if hasattr(delta, 'tool_calls') and delta.tool_calls:
+                    for tc in delta.tool_calls:
+                        tool_calls_buffer.append(tc)
+                    if on_content_chunk:
+                        on_content_chunk("")
+                    continue
                 
                 if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
                     thinking_text = delta.reasoning_content
@@ -254,6 +369,98 @@ class DeepSeekClient:
                     full_content += content_text
                     if on_content_chunk:
                         on_content_chunk(content_text)
+            
+            if tool_calls_buffer:
+                valid_tool_calls = [tc for tc in tool_calls_buffer if tc.function and tc.function.name]
+                logger.info(f"检测到工具调用请求: {[tc.function.name for tc in valid_tool_calls]}")
+                
+                if not valid_tool_calls:
+                    logger.warning("没有有效的工具调用，返回已有内容")
+                    return full_content if full_content else None
+                
+                is_reasoner = "reasoner" in self.model.lower()
+                
+                if is_reasoner or thinking_mode:
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": full_content,
+                        "reasoning_content": full_thinking if full_thinking else None,
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                },
+                                "type": tc.type
+                            }
+                            for tc in valid_tool_calls
+                        ]
+                    }
+                else:
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": full_content,
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                },
+                                "type": tc.type
+                            }
+                            for tc in valid_tool_calls
+                        ]
+                    }
+                deepseek_messages.append(assistant_message)
+                
+                for tool in valid_tool_calls:
+                    tool_function = TOOL_CALL_MAP[tool.function.name]
+                    tool_result = tool_function()
+                    logger.info(f"工具 {tool.function.name} 返回结果: {tool_result}")
+                    
+                    deepseek_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool.id,
+                        "content": tool_result,
+                    })
+                
+                full_content = ""
+                
+                second_response_params = {
+                    "model": self.model,
+                    "messages": deepseek_messages,
+                    "stream": True,
+                    "extra_body": extra_body
+                }
+                
+                if not is_reasoner:
+                    second_response_params["temperature"] = temperature
+                
+                logger.info(f"发送第二次请求，消息历史长度: {len(deepseek_messages)}")
+                
+                second_response = self.client.chat.completions.create(**second_response_params)
+                
+                for chunk in second_response:
+                    delta = chunk.choices[0].delta
+                    
+                    if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                        thinking_text = delta.reasoning_content
+                        full_thinking += thinking_text
+                        reasoning_started = True
+                        if on_thinking_chunk:
+                            on_thinking_chunk(thinking_text)
+                    
+                    if hasattr(delta, 'content') and delta.content:
+                        if reasoning_started and on_reasoning_finished:
+                            on_reasoning_finished()
+                            reasoning_started = False
+                        
+                        content_text = delta.content
+                        full_content += content_text
+                        if on_content_chunk:
+                            on_content_chunk(content_text)
             
             logger.info(f"AI 流式回复生成完成，最终内容长度: {len(full_content)}")
             if full_thinking:
