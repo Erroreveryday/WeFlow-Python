@@ -460,6 +460,11 @@ class MainWindow(QMainWindow):
         logging.info(f"内容: {content}")
         logging.info(f"==================")
         
+        # 过滤只包含 [] 符号或 [] 包裹的字符的消息
+        if self._is_bracket_only_message(content):
+            logging.info(f"消息只包含 [] 符号或 [] 包裹的内容，跳过自动回复")
+            return
+        
         # 检查自动回复配置
         auto_reply_config = self.config.get('auto_reply', {})
         reply_type = auto_reply_config.get('reply_type', 'fixed')
@@ -472,6 +477,63 @@ class MainWindow(QMainWindow):
         
         # 执行测试消息流程
         self.execute_test_message_flow(session)
+    
+    def _is_bracket_only_message(self, content: str) -> bool:
+        """
+        检查消息是否只包含 [] 符号或 [] 包裹的字符
+        
+        包括：
+        - []
+        - [动画表情]
+        - [微信表情]
+        - [视频]
+        - [多组字符][多组字符][多组字符]……
+        - [文件] 开头的消息（如 [文件] 学习计划.docx）
+        - [位置] 开头的消息（如 [位置] 北京市）
+        
+        Args:
+            content: 消息内容
+            
+        Returns:
+            如果消息只包含 [] 符号或 [] 包裹的内容，或者以 [文件] 或 [位置] 开头，返回 True；否则返回 False
+        """
+        if not content:
+            return True
+        
+        import re
+        # 检查是否以 [文件] 或 [位置] 开头（后面需要有实际内容）
+        stripped_content = content.strip()
+        # [文件] 后面是空格或看起来像文件名的内容
+        # [位置] 后面是空格或看起来像地址的内容
+        if stripped_content.startswith('[文件]') or stripped_content.startswith('[位置]'):
+            after_bracket = stripped_content[4:]
+            # 如果 [文件] 或 [位置] 后面没有任何内容，则不屏蔽
+            if not after_bracket:
+                return False
+            # 检查是否看起来像有效的文件或位置消息
+            # 文件：后面有空格，或者有文件扩展名
+            # 位置：后面有空格，或者包含省/市/区/县/路/街/道/巷等常见地址关键词
+            # 或者包含常见的城市名（直辖市、省会城市等）
+            city_keywords = ['省', '市', '区', '县', '路', '街', '道', '巷', '城', '镇', '乡',
+                            '北京', '上海', '天津', '重庆', '广州', '深圳', '武汉', '成都', 
+                            '杭州', '南京', '西安', '苏州', '长沙', '郑州', '济南', '青岛',
+                            '福州', '厦门', '南昌', '合肥', '昆明', '沈阳', '大连', '哈尔滨',
+                            '长春', '石家庄', '太原', '呼和浩特', '海口', '三亚', '兰州', 
+                            '银川', '西宁', '乌鲁木齐', '拉萨', '贵阳', '东莞', '佛山', '宁波',
+                            '无锡', '温州', '常州', '徐州', '南通', '扬州', '盐城', '淮安',
+                            '连云港', '泰州', '镇江', '嘉兴', '湖州', '绍兴', '金华', '衢州',
+                            '台州', '丽水', '舟山', '芜湖', '蚌埠', '淮南', '马鞍山', '黄山',
+                            '滁州', '阜阳', '宿州', '六安', '亳州', '池州', '宣城', '宿迁']
+            if after_bracket.startswith(' ') or \
+               '.' in after_bracket or \
+               any(keyword in after_bracket for keyword in city_keywords):
+                return True
+            # 其他情况不屏蔽
+        
+        # 移除所有 [] 包裹的内容（包括空括号 []）
+        cleaned = re.sub(r'\[.*?\]', '', content)
+        # 检查清理后是否为空或只包含空白字符
+        return len(cleaned.strip()) == 0
     
     def execute_test_message_flow(self, session: dict):
         """执行测试消息流程（在后台线程中执行）"""
