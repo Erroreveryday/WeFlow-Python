@@ -1500,10 +1500,16 @@ class AutoReplyConfigDialog(QDialog):
         deepseek_layout.addRow("API密钥:", self.deepseek_api_key)
         
         self.deepseek_model = QComboBox()
-        self.deepseek_model.addItems(["deepseek-chat", "deepseek-reasoner"])
+        self.deepseek_model_display_map = {
+            "deepseek-chat": "DeepSeek-V3.2",
+            "deepseek-reasoner": "DeepSeek-V3.2 [深度思考]"
+        }
+        self.deepseek_model_reverse_map = {v: k for k, v in self.deepseek_model_display_map.items()}
+        self.deepseek_model.addItems(list(self.deepseek_model_display_map.values()))
         deepseek_model_value = deepseek_config.get('model', 'deepseek-chat')
-        if deepseek_model_value in ["deepseek-chat", "deepseek-reasoner"]:
-            self.deepseek_model.setCurrentText(deepseek_model_value)
+        display_name = self.deepseek_model_display_map.get(deepseek_model_value, deepseek_model_value)
+        if display_name in self.deepseek_model_display_map.values():
+            self.deepseek_model.setCurrentText(display_name)
         deepseek_layout.addRow("选择模型:", self.deepseek_model)
         
         self.deepseek_system_prompt = QTextEdit(deepseek_config.get('system_prompt', '你模拟我与对方聊天。需注意：不要使用Markdown语法，尤其是加粗语法**粗体**。'))
@@ -1578,7 +1584,7 @@ class AutoReplyConfigDialog(QDialog):
             },
             'deepseek': {
                 'api_key': self.deepseek_api_key.text(),
-                'model': self.deepseek_model.currentText(),
+                'model': self.deepseek_model_reverse_map.get(self.deepseek_model.currentText(), self.deepseek_model.currentText()),
                 'system_prompt': self.deepseek_system_prompt.toPlainText()
             }
         }
