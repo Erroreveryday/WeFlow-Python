@@ -1387,12 +1387,12 @@ class AutoReplyConfigDialog(QDialog):
                 'aliyun': {
                     'api_key': '',
                     'model': 'qwen-turbo',
-                    'system_prompt': '你模拟我与对方聊天。'
+                    'system_prompt': '你模拟我与对方聊天。需注意：不要使用Markdown语法，尤其是加粗语法**粗体**。'
                 },
                 'deepseek': {
                     'api_key': '',
                     'model': 'deepseek-chat',
-                    'system_prompt': '你模拟我与对方聊天。'
+                    'system_prompt': '你模拟我与对方聊天。需注意：不要使用Markdown语法，尤其是加粗语法**粗体**。'
                 }
             }
         }
@@ -1478,7 +1478,7 @@ class AutoReplyConfigDialog(QDialog):
             self.aliyun_model.setCurrentText(aliyun_model_value)
         aliyun_layout.addRow("选择模型:", self.aliyun_model)
         
-        self.aliyun_system_prompt = QTextEdit(aliyun_config.get('system_prompt', '你模拟我与对方聊天。'))
+        self.aliyun_system_prompt = QTextEdit(aliyun_config.get('system_prompt', '你模拟我与对方聊天。需注意：不要使用Markdown语法，尤其是加粗语法**粗体**。'))
         self.aliyun_system_prompt.setPlaceholderText("请输入系统提示词")
         self.aliyun_system_prompt.setMinimumHeight(80)
         aliyun_layout.addRow("系统提示词:", self.aliyun_system_prompt)
@@ -1506,7 +1506,7 @@ class AutoReplyConfigDialog(QDialog):
             self.deepseek_model.setCurrentText(deepseek_model_value)
         deepseek_layout.addRow("选择模型:", self.deepseek_model)
         
-        self.deepseek_system_prompt = QTextEdit(deepseek_config.get('system_prompt', '你模拟我与对方聊天。'))
+        self.deepseek_system_prompt = QTextEdit(deepseek_config.get('system_prompt', '你模拟我与对方聊天。需注意：不要使用Markdown语法，尤其是加粗语法**粗体**。'))
         self.deepseek_system_prompt.setPlaceholderText("请输入系统提示词")
         self.deepseek_system_prompt.setMinimumHeight(80)
         deepseek_layout.addRow("系统提示词:", self.deepseek_system_prompt)

@@ -36,7 +36,7 @@ def load_config(config_file='config.json'):
             },
             "auto_reply": {
                 "reply_type": "fixed",
-                "fixed_text": "这是一条测试消息",
+                "fixed_text": "[自动回复]这是一条测试消息",
                 "ai_config": {
                     "provider": "deepseek",
                     "thinking_mode": False,
@@ -51,11 +51,11 @@ def load_config(config_file='config.json'):
                 "providers": {
                     "aliyun": {
                         "models": ["qwen3.5-flash", "qwen3.5-plus", "qwen3-max"],
-                        "system_prompt": "你模拟我与对方聊天。"
+                        "system_prompt": "你模拟我与对方聊天。需注意：不要使用Markdown语法，尤其是加粗语法**粗体**。"
                     },
                     "deepseek": {
                         "models": ["deepseek-chat", "deepseek-reasoner"],
-                        "system_prompt": "你模拟我与对方聊天。"
+                        "system_prompt": "你模拟我与对方聊天。需注意：不要使用Markdown语法，尤其是加粗语法**粗体**。"
                     }
                 }
             }
@@ -99,7 +99,7 @@ def load_config(config_file='config.json'):
             },
             "auto_reply": {
                 "reply_type": "fixed",
-                "fixed_text": "这是一条测试消息",
+                "fixed_text": "[自动回复]这是一条测试消息",
                 "ai_config": {
                     "provider": "deepseek",
                     "thinking_mode": False,
@@ -114,11 +114,11 @@ def load_config(config_file='config.json'):
                 "providers": {
                     "aliyun": {
                         "models": ["qwen3.5-flash", "qwen3.5-plus", "qwen3-max"],
-                        "system_prompt": "你模拟我与对方聊天。"
+                        "system_prompt": "你模拟我与对方聊天。需注意：不要使用Markdown语法，尤其是加粗语法**粗体**。"
                     },
                     "deepseek": {
                         "models": ["deepseek-chat", "deepseek-reasoner"],
-                        "system_prompt": "你模拟我与对方聊天。"
+                        "system_prompt": "你模拟我与对方聊天。需注意：不要使用Markdown语法，尤其是加粗语法**粗体**。"
                     }
                 }
             }
