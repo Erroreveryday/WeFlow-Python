@@ -1463,7 +1463,16 @@ class AutoReplyConfigDialog(QDialog):
         providers_layout = QHBoxLayout()
         
         # 阿里云配置
-        self.aliyun_group = QGroupBox("阿里云配置")
+        self.aliyun_group = QGroupBox()
+        aliyun_header_layout = QHBoxLayout()
+        aliyun_title_label = QLabel("阿里云配置")
+        aliyun_title_label.setStyleSheet("font-weight: bold;")
+        aliyun_not_developed_label = QLabel("尚未开发")
+        aliyun_not_developed_label.setStyleSheet("color: red; font-weight: bold; font-size: 14px;")
+        aliyun_header_layout.addWidget(aliyun_title_label)
+        aliyun_header_layout.addWidget(aliyun_not_developed_label)
+        aliyun_header_layout.addStretch()
+        
         aliyun_layout = QFormLayout()
         
         aliyun_config = self.auto_reply_config.get('ai_config', {}).get('aliyun', {})
@@ -1483,7 +1492,10 @@ class AutoReplyConfigDialog(QDialog):
         self.aliyun_system_prompt.setMinimumHeight(80)
         aliyun_layout.addRow("系统提示词:", self.aliyun_system_prompt)
         
-        self.aliyun_group.setLayout(aliyun_layout)
+        aliyun_main_layout = QVBoxLayout()
+        aliyun_main_layout.addLayout(aliyun_header_layout)
+        aliyun_main_layout.addLayout(aliyun_layout)
+        self.aliyun_group.setLayout(aliyun_main_layout)
         self.aliyun_group.setMinimumWidth(300)  # 增加最小宽度
         providers_layout.addWidget(self.aliyun_group, 1)  # 添加拉伸因子
         
@@ -1491,7 +1503,13 @@ class AutoReplyConfigDialog(QDialog):
         providers_layout.addSpacing(10)
         
         # DeepSeek配置
-        self.deepseek_group = QGroupBox("DeepSeek配置")
+        self.deepseek_group = QGroupBox()
+        deepseek_header_layout = QHBoxLayout()
+        deepseek_title_label = QLabel("DeepSeek配置")
+        deepseek_title_label.setStyleSheet("font-weight: bold;")
+        deepseek_header_layout.addWidget(deepseek_title_label)
+        deepseek_header_layout.addStretch()
+        
         deepseek_layout = QFormLayout()
         
         deepseek_config = self.auto_reply_config.get('ai_config', {}).get('deepseek', {})
@@ -1517,7 +1535,10 @@ class AutoReplyConfigDialog(QDialog):
         self.deepseek_system_prompt.setMinimumHeight(80)
         deepseek_layout.addRow("系统提示词:", self.deepseek_system_prompt)
         
-        self.deepseek_group.setLayout(deepseek_layout)
+        deepseek_main_layout = QVBoxLayout()
+        deepseek_main_layout.addLayout(deepseek_header_layout)
+        deepseek_main_layout.addLayout(deepseek_layout)
+        self.deepseek_group.setLayout(deepseek_main_layout)
         self.deepseek_group.setMinimumWidth(300)  # 增加最小宽度
         providers_layout.addWidget(self.deepseek_group, 1)  # 添加拉伸因子
         
@@ -1560,6 +1581,25 @@ class AutoReplyConfigDialog(QDialog):
         else:  # DeepSeek
             self.aliyun_group.setEnabled(False)
             self.deepseek_group.setEnabled(True)
+    
+    def accept(self):
+        """重写accept方法，在选择阿里云时弹出警告并阻止保存"""
+        from PyQt5.QtWidgets import QMessageBox
+        
+        # 检查是否选择了AI回复类型
+        if self.ai_reply_radio.isChecked():
+            # 检查是否选择了阿里云
+            if self.provider_combo.currentIndex() == 0:  # 阿里云
+                QMessageBox.warning(
+                    self,
+                    "警告",
+                    "阿里云配置尚未开发，无法保存！\n\n请选择DeepSeek作为AI提供商。",
+                    QMessageBox.Ok
+                )
+                return  # 阻止保存
+        
+        # 如果不是阿里云，则正常保存
+        super().accept()
     
     def get_auto_reply_config(self):
         """获取自动回复配置"""
