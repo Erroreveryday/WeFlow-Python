@@ -1402,6 +1402,9 @@ class AutoReplyConfigDialog(QDialog):
         self.setWindowTitle("自动回复配置")
         self.setGeometry(200, 200, 450, 350)
         
+        # 移除问号帮助按钮
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        
         layout = QVBoxLayout()
         
         # 自动回复类型选择
